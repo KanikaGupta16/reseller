@@ -1,47 +1,114 @@
 'use client'
 
-import { useCallback, useRef, useState, useEffect } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
-type UploadStep = 'idle' | 'processing' | 'result'
-type AgentState = 'idle' | 'working' | 'done'
+/* ─────────────────────────────────────────────────────────────────────── */
+/*  Constants & mock data                                                   */
+/* ─────────────────────────────────────────────────────────────────────── */
 
-const SLIDE_COUNT = 5  // 0=hero, 1=upload, 2=scout, 3=studio, 4=closer
+const SLIDE_COUNT = 6   // 0=hero 1=scout 2=studio 3=closer 4=stats 5=upload
 
 const MOCK_ITEMS = [
-  { title: "Vintage Levi's 501 Jeans",  price: 68,  demand: 94, tags: ['vintage','denim','y2k','levi'] },
-  { title: 'Nike Air Force 1 Low',       price: 115, demand: 88, tags: ['nike','sneakers','af1','white'] },
-  { title: 'Y2K Butterfly Crop Top',     price: 32,  demand: 97, tags: ['y2k','crop','butterfly','tops'] },
-  { title: 'Coach Crossbody Bag',        price: 220, demand: 91, tags: ['coach','bag','designer','brown'] },
-  { title: 'Ralph Lauren Polo Shirt',    price: 45,  demand: 82, tags: ['ralph','polo','preppy','vintage'] },
+  { title: "Vintage Levi's 501 Jeans",  price: 68,  demand: 94, tags: ['vintage','denim','y2k'] },
+  { title: 'Nike Air Force 1 Low',       price: 115, demand: 88, tags: ['nike','af1','white'] },
+  { title: 'Coach Crossbody Bag',        price: 220, demand: 91, tags: ['coach','designer','brown'] },
+  { title: 'Ralph Lauren Polo Shirt',    price: 45,  demand: 82, tags: ['ralph','polo','preppy'] },
 ]
 
-/* ── Curly SVG arrows ── */
-const CurlyRight = ({ color = 'currentColor' }: { color?: string }) => (
-  <svg width="56" height="32" viewBox="0 0 56 32" fill="none">
-    <path d="M4 20 C8 6 28 2 44 14" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-    <path d="M38 8 L44 14 L37 19" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+// Mock stats — will come from Supabase
+const STATS = { listed: 2847, revenue: 142320, avgHours: 4.2, acceptance: 98 }
+
+const LIVE_FEED = [
+  { icon: '📦', label: 'listed',  title: 'Jordan 1 Mid',        price: '$145', platform: 'Depop',     mins: 2  },
+  { icon: '✅', label: 'sold',    title: 'Coach Crossbody',      price: '$220', platform: 'FB',        mins: 5  },
+  { icon: '📦', label: 'listed',  title: "Vintage Levi's 501",   price: '$68',  platform: 'Depop',     mins: 8  },
+  { icon: '💬', label: 'offer',   title: 'Nike Air Force 1',     price: '$105', platform: 'FB',        mins: 11 },
+  { icon: '✅', label: 'sold',    title: 'Y2K Butterfly Top',    price: '$32',  platform: 'Vinted',    mins: 15 },
+]
+
+const SCOUT_TIPS  = ['🔍 Scanning 847 live listings...','📊 23 comparable items found','💰 Sweet spot: $45 – $68','✓ Scout is done']
+const STUDIO_TIPS = ['🎬 Writing your listing copy...','✓ Title crafted','✓ Description generated','📸 Photo tags added']
+const CLOSER_TIPS = ['🤝 Configuring Closer...','✓ Offer scoring ready','📅 Calendar synced','✅ All agents standing by']
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/*  SVG Curly arrows                                                        */
+/* ─────────────────────────────────────────────────────────────────────── */
+const CurlyRight = ({ c = 'currentColor' }: { c?: string }) => (
+  <svg width="52" height="30" viewBox="0 0 52 30" fill="none">
+    <path d="M3 19 C7 5 26 1 42 13" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+    <path d="M36 7 L42 13 L35 18" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 )
-const CurlyLeft = ({ color = 'currentColor' }: { color?: string }) => (
-  <svg width="56" height="32" viewBox="0 0 56 32" fill="none">
-    <path d="M52 20 C48 6 28 2 12 14" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-    <path d="M18 8 L12 14 L19 19" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+const CurlyLeft = ({ c = 'currentColor' }: { c?: string }) => (
+  <svg width="52" height="30" viewBox="0 0 52 30" fill="none">
+    <path d="M49 19 C45 5 26 1 10 13" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+    <path d="M16 7 L10 13 L17 18" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 )
-const CurlyDown = ({ color = 'currentColor' }: { color?: string }) => (
-  <svg width="32" height="52" viewBox="0 0 32 52" fill="none">
-    <path d="M10 4 C24 8 28 28 16 44" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
-    <path d="M9 37 L16 44 L22 37" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+const CurlyDown = ({ c = 'currentColor' }: { c?: string }) => (
+  <svg width="28" height="50" viewBox="0 0 28 50" fill="none">
+    <path d="M9 3 C23 7 27 26 15 43" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+    <path d="M9 36 L15 43 L21 36" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 )
 
+/* ─────────────────────────────────────────────────────────────────────── */
+/*  Animated counter                                                        */
+/* ─────────────────────────────────────────────────────────────────────── */
+function AnimatedNum({ target, prefix = '', suffix = '', isActive }: {
+  target: number; prefix?: string; suffix?: string; isActive: boolean
+}) {
+  const [val, setVal] = useState(0)
+  useEffect(() => {
+    if (!isActive) { setVal(0); return }
+    const start = performance.now(), dur = 1800
+    let rafId: number
+    const tick = (now: number) => {
+      const p = Math.min((now - start) / dur, 1)
+      const e = 1 - Math.pow(1 - p, 3)
+      setVal(Math.floor(e * target))
+      if (p < 1) rafId = requestAnimationFrame(tick)
+      else setVal(target)
+    }
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [isActive, target])
+  return <>{prefix}{val.toLocaleString()}{suffix}</>
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/*  Agent row                                                               */
+/* ─────────────────────────────────────────────────────────────────────── */
+type AgentState = 'idle' | 'working' | 'done'
+function AgentRow({ icon, name, label, state, delay }: {
+  icon: string; name: string; label: string; state: AgentState; delay: number
+}) {
+  return (
+    <div className={`agent-row agent-row--${state}`} style={{ animationDelay: `${delay * 0.2}s` }}>
+      <span className="agent-row-icon">{icon}</span>
+      <div className="agent-row-body">
+        <span className="agent-row-name">{name}</span>
+        <span className="agent-row-label">{label}</span>
+      </div>
+      {state === 'idle'    && <span className="agent-dot agent-dot--idle" />}
+      {state === 'working' && <span className="agent-dot agent-dot--pulse" />}
+      {state === 'done'    && <span className="agent-check">✓</span>}
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/*  Main page                                                               */
+/* ─────────────────────────────────────────────────────────────────────── */
 export default function Home() {
-  const sectionRef   = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const waveRef      = useRef<HTMLCanvasElement>(null)
+  const stageRef    = useRef<HTMLDivElement>(null)
+  const fileInputRef= useRef<HTMLInputElement>(null)
+  const waveRef     = useRef<HTMLCanvasElement>(null)
+  const slideRef    = useRef(0)
+  const locked      = useRef(false)
 
-  const [slideIndex, setSlideIndex] = useState(0)
-  const [uploadStep, setUploadStep] = useState<UploadStep>('idle')
+  const [slide, setSlide]           = useState(0)
+  const [uploadStep, setUploadStep] = useState<'idle' | 'processing' | 'done'>('idle')
   const [uploadedImg, setUploadedImg] = useState<string | null>(null)
   const [dragOver, setDragOver]     = useState(false)
   const [scout,  setScout]          = useState<AgentState>('idle')
@@ -49,25 +116,7 @@ export default function Home() {
   const [closer, setCloser]         = useState<AgentState>('idle')
   const [item]                      = useState(() => MOCK_ITEMS[Math.floor(Math.random() * MOCK_ITEMS.length)])
 
-  /* scroll → slide index */
-  useEffect(() => {
-    const onScroll = () => {
-      const vh = window.innerHeight
-      const raw = window.scrollY / vh
-      const idx = Math.min(SLIDE_COUNT - 1, Math.max(0, Math.round(raw)))
-      setSlideIndex(idx)
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
-
-  const goTo = useCallback((idx: number) => {
-    const clamped = Math.max(0, Math.min(SLIDE_COUNT - 1, idx))
-    window.scrollTo({ top: clamped * window.innerHeight, behavior: 'smooth' })
-  }, [])
-
-  /* waveform */
+  /* waveform canvas */
   useEffect(() => {
     let id: number
     const wc = waveRef.current; if (!wc) return
@@ -90,18 +139,70 @@ export default function Home() {
       }
       id = requestAnimationFrame(draw)
     }
-    id = requestAnimationFrame(draw); return () => cancelAnimationFrame(id)
+    id = requestAnimationFrame(draw)
+    return () => cancelAnimationFrame(id)
   }, [])
 
-  /* upload flow */
+  /* ─── wheel intercept ─── */
+  const goTo = useCallback((idx: number) => {
+    if (locked.current) return
+    if (idx >= SLIDE_COUNT) {
+      // Exit slides → scroll to agents section
+      document.getElementById('below-fold')?.scrollIntoView({ behavior: 'smooth' })
+      return
+    }
+    if (idx < 0) return
+    locked.current = true
+    slideRef.current = idx
+    setSlide(idx)
+    setTimeout(() => { locked.current = false }, 680)
+  }, [])
+
+  useEffect(() => {
+    const onWheel = (e: WheelEvent) => {
+      if (window.scrollY > 60) return   // user has scrolled past stage → don't intercept
+      e.preventDefault()
+      if (e.deltaY > 4)  goTo(slideRef.current + 1)
+      if (e.deltaY < -4) goTo(slideRef.current - 1)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (window.scrollY > 60) return
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') goTo(slideRef.current + 1)
+      if (e.key === 'ArrowUp'  || e.key === 'ArrowLeft')  goTo(slideRef.current - 1)
+    }
+    // Touch
+    let ty0 = 0
+    const onTouchStart = (e: TouchEvent) => { ty0 = e.touches[0].clientY }
+    const onTouchEnd   = (e: TouchEvent) => {
+      if (window.scrollY > 60) return
+      const dy = ty0 - e.changedTouches[0].clientY
+      if (Math.abs(dy) < 40) return
+      e.preventDefault()
+      if (dy > 0) goTo(slideRef.current + 1)
+      else goTo(slideRef.current - 1)
+    }
+    window.addEventListener('wheel', onWheel, { passive: false })
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchend', onTouchEnd, { passive: false })
+    return () => {
+      window.removeEventListener('wheel', onWheel)
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [goTo])
+
+  /* ─── upload flow ─── */
   const runProcessing = useCallback((img: string) => {
-    setUploadedImg(img); setScout('idle'); setStudio('idle'); setCloser('idle')
+    setUploadedImg(img)
+    setScout('idle'); setStudio('idle'); setCloser('idle')
     setUploadStep('processing')
-    setTimeout(() => setScout('working'), 300)
+    setTimeout(() => setScout('working'), 200)
     setTimeout(() => { setScout('done'); setStudio('working') }, 1800)
     setTimeout(() => { setStudio('done'); setCloser('working') }, 3200)
     setTimeout(() => setCloser('done'), 4400)
-    setTimeout(() => setUploadStep('result'), 4900)
+    setTimeout(() => setUploadStep('done'), 4900)
   }, [])
 
   const handleFile = useCallback((file: File) => {
@@ -118,305 +219,339 @@ export default function Home() {
 
   const scrollToCta = () => document.getElementById('cta-email')?.focus()
 
-  /* nav color: white on hero (dark photo), black on everything else */
-  const navDark = slideIndex === 0
+  /* panel class helper */
+  const cls = (n: number) =>
+    `sp ${slide === n ? 'sp--on' : slide > n ? 'sp--prev' : 'sp--next'}`
 
-  /* panel visibility helper */
-  const active = (n: number) => slideIndex === n
-  const prev   = (n: number) => slideIndex > n
-  const panelCls = (n: number) => `slide-panel ${active(n) ? 'slide-panel--active' : prev(n) ? 'slide-panel--prev' : ''}`
+  /* ─── tips for upload right panel ─── */
+  const tips: string[] = []
+  if (scout  !== 'idle') tips.push(...SCOUT_TIPS.slice(0, scout  === 'done' ? 4 : 1))
+  if (studio !== 'idle') tips.push(...STUDIO_TIPS.slice(0, studio === 'done' ? 4 : 1))
+  if (closer !== 'idle') tips.push(...CLOSER_TIPS.slice(0, closer === 'done' ? 4 : 1))
 
   return (
     <>
-      {/* ── NAV (fixed, color-aware) ── */}
-      <nav className={`nav ${navDark ? 'nav--dark' : 'nav--light'}`}>
+      {/* ── NAV ── */}
+      <nav className={`nav ${slide === 0 ? 'nav--dark' : 'nav--light'}`}>
         <a href="#" className="logo">reseller.</a>
-        <button className={`pill ${navDark ? 'pill-white' : ''}`} onClick={scrollToCta}>Get Access</button>
+        <button className={`pill ${slide === 0 ? 'pill-white' : ''}`} onClick={scrollToCta}>
+          Get Access
+        </button>
       </nav>
 
-      {/* ── STICKY SLIDE SECTION ── */}
-      <div ref={sectionRef} style={{ height: `${SLIDE_COUNT * 100}svh` }}>
-        <div className="sticky-stage">
+      {/* ── STICKY STAGE (100vh, intercepted by wheel) ── */}
+      <div ref={stageRef} className="stage">
 
-          {/* ─── SLIDE 0: HERO ─── */}
-          <div className={panelCls(0)} style={{ display: 'block' }}>
-            <div className="hero-bg">
+        {/* ─── SLIDE 0: HERO ─── */}
+        <div className={cls(0)} style={{ display: 'block' }}>
+          <div className="hero-bg">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/closet.avif" alt="Pile of clothes to sell" />
+            <div className="hero-grad" />
+          </div>
+          <div className="hero-copy">
+            <div className="hero-badge">
+              <span className="bdot" /> AI-Powered Reselling · Beta
+            </div>
+            <h1 className="hero-h1">
+              your pile is<br /><em>money</em><br />waiting. 💸
+            </h1>
+            <p className="hero-sub">Scout prices it. Studio lists it. Closer sells it. Just upload a photo.</p>
+            <div className="hero-ctas">
+              <button className="pill pill-white pill-big" onClick={() => goTo(5)}>Let&apos;s start →</button>
+              <button className="pill pill-big pill-ow" onClick={() => goTo(1)}>See how it works</button>
+            </div>
+          </div>
+          <div className="hero-mark" aria-hidden="true">reseller.</div>
+          <button className="scroll-cue" onClick={() => goTo(1)} aria-label="Next">
+            <CurlyDown c="rgba(255,255,255,0.55)" />
+            <span>scroll</span>
+          </button>
+        </div>
+
+        {/* ─── SLIDE 1: SCOUT (blue) ─── */}
+        <div className={cls(1)} style={{ background: 'var(--blue)' }}>
+          <div className="split">
+            <div className="sl sl--blue">
+              <div className="step-lbl">01 / scout</div>
+              <h2 className="sl-h2">priced before<br />you post. <em>🔍</em></h2>
+              <p className="sl-p">Scout scans live Depop, eBay, and FB Marketplace in real time to find the price that sells fast — not the one that sits.</p>
+              <div className="price-badge" style={{ marginTop: '1rem' }}>
+                $187 <span className="pl">Scout says</span>
+              </div>
+            </div>
+            <div className="sr" style={{ background: 'var(--blue)' }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/closet.avif" alt="Pile of clothes" />
-              <div className="hero-bg-grad" />
-            </div>
-            <div className="hero-content">
-              <div className="hero-badge">
-                <span className="badge-dot" />&nbsp;AI-Powered Reselling · Beta
-              </div>
-              <h1 className="hero-h1">
-                your pile is<br /><em>money</em><br />waiting. 💸
-              </h1>
-              <p className="hero-sub">Scout prices it. Studio lists it. Closer sells it. You just upload a photo.</p>
-              <div className="hero-cta-row">
-                <button className="pill pill-white pill-big" onClick={() => goTo(1)}>
-                  Try it out →
-                </button>
-                <button className="pill pill-big pill-outline-w" onClick={() => document.getElementById('agents')?.scrollIntoView({ behavior: 'smooth' })}>
-                  See how
-                </button>
-              </div>
-            </div>
-            <div className="hero-wordmark" aria-hidden="true">reseller.</div>
-            {/* Scroll down cue */}
-            <button className="scroll-cue" onClick={() => goTo(1)} aria-label="Next slide">
-              <CurlyDown color="rgba(255,255,255,0.6)" />
-              <span>scroll</span>
-            </button>
-          </div>
-
-          {/* ─── SLIDE 1: UPLOAD ─── */}
-          <div className={panelCls(1)} style={{ background: '#fff' }}>
-            <div className="slide-split">
-              {/* Left */}
-              <div className="slide-left slide-left--white">
-                <div className="slide-step-label">01 / upload</div>
-
-                {uploadStep === 'idle' && <>
-                  <h2 className="slide-h2">drop your<br />item. <em>📸</em></h2>
-                  <p className="slide-p">Any item from your closet, haul, or shelf. Scout will price it in seconds.</p>
-                  <div
-                    className={`drop-zone ${dragOver ? 'drop-zone--over' : ''}`}
-                    onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
-                    onClick={() => fileInputRef.current?.click()}
-                    role="button" tabIndex={0}
-                    onKeyDown={e => e.key === 'Enter' && fileInputRef.current?.click()}
-                  >
-                    <span className="drop-icon">📷</span>
-                    <span className="drop-label">drag & drop or click to upload</span>
-                    <span className="drop-hint">jpg · png · webp — anything works</span>
-                  </div>
-                  <input ref={fileInputRef} type="file" accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
-                </>}
-
-                {uploadStep === 'processing' && <>
-                  <h2 className="slide-h2">analysing<br />your item. <em>⚡</em></h2>
-                  <div className="agent-status-list">
-                    <AgentRow icon="🔍" name="Scout"  label="scanning live comps"     state={scout}  delay={0} />
-                    <AgentRow icon="🎬" name="Studio" label="writing listing + video" state={studio} delay={1} />
-                    <AgentRow icon="🤝" name="Closer" label="setting up DM replies"   state={closer} delay={2} />
-                  </div>
-                </>}
-
-                {uploadStep === 'result' && <>
-                  <h2 className="slide-h2">listed &<br /><em>ready. 🎉</em></h2>
-                  <div className="result-card">
-                    <div className="result-badge">✅ listing ready</div>
-                    <div className="result-title">{item.title}</div>
-                    <div className="result-row">
-                      <div>
-                        <div className="result-price-val">${item.price}</div>
-                        <div className="result-price-lbl">Scout&apos;s price</div>
-                      </div>
-                      <div className="result-demand-wrap">
-                        <span className="result-demand-bar" style={{ '--pct': `${item.demand}%` } as React.CSSProperties} />
-                        <span className="result-demand-lbl">{item.demand}% demand</span>
-                      </div>
-                    </div>
-                    <div className="chip-row" style={{ justifyContent: 'flex-start', marginTop: '0.75rem' }}>
-                      {item.tags.map(t => <span key={t} className="chip">{t}</span>)}
-                    </div>
-                  </div>
-                  <div className="result-ctas">
-                    <button className="pill pill-big" style={{ background: 'var(--pink-2)' }}>Push live →</button>
-                    <button className="pill pill-big pill-outline" onClick={resetUpload}>Try another</button>
-                  </div>
-                </>}
-              </div>
-
-              {/* Right — clean, no animation */}
-              <div className="slide-right" style={{ background: '#F8F4F2' }}>
-                {uploadedImg ? (
-                  <div className="upload-preview">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={uploadedImg} alt="Your uploaded item" className="upload-preview-img" />
-                    {uploadStep === 'result' && (
-                      <div className="upload-preview-badge">listed on depop + fb 🎉</div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="upload-placeholder">
-                    <span className="upload-placeholder-icon">🏷️</span>
-                    <span className="upload-placeholder-text">your item goes here</span>
-                  </div>
-                )}
-              </div>
+              <img src="/images/sneaker.avif" alt="Sneaker" className="blend" />
             </div>
           </div>
+        </div>
 
-          {/* ─── SLIDE 2: SCOUT ─── */}
-          <div className={panelCls(2)} style={{ background: 'var(--blue)' }}>
-            <div className="slide-split">
-              <div className="slide-left slide-left--blue">
-                <div className="slide-step-label">02 / scout</div>
-                <h2 className="slide-h2">priced before<br />you post. <em>🔍</em></h2>
-                <p className="slide-p">Scout scans live Depop, eBay, and FB Marketplace to find the exact price that moves fast — not the one that sits for months.</p>
-                <div className="price-badge" style={{ marginTop: '1rem' }}>
-                  $187 <span className="price-label">Scout says</span>
-                </div>
-              </div>
-              <div className="slide-right slide-right--blend" style={{ background: 'var(--blue)' }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/images/sneaker.avif" alt="Nike Air Jordan sneaker" className="blend-img" />
-              </div>
+        {/* ─── SLIDE 2: STUDIO (pink) ─── */}
+        <div className={cls(2)} style={{ background: 'var(--pink)' }}>
+          <div className="split">
+            <div className="sl sl--pink">
+              <div className="step-lbl">02 / studio</div>
+              <h2 className="sl-h2">listed in<br />60 seconds. <em>🎬</em></h2>
+              <p className="sl-p">Studio writes the title, description, and tags — then generates a 15-second product video and posts to every platform at once.</p>
+              <button className="pill pill-big" style={{ marginTop: '1rem' }}>See Studio in action</button>
+            </div>
+            <div className="sr" style={{ background: 'var(--pink)' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/blazer.avif" alt="Pink blazer listing" className="blend" />
             </div>
           </div>
+        </div>
 
-          {/* ─── SLIDE 3: STUDIO ─── */}
-          <div className={panelCls(3)} style={{ background: 'var(--pink)' }}>
-            <div className="slide-split">
-              <div className="slide-left slide-left--pink">
-                <div className="slide-step-label">03 / studio</div>
-                <h2 className="slide-h2">listed in<br />60 seconds. <em>🎬</em></h2>
-                <p className="slide-p">Studio writes the title, description, tags — then generates a 15-second product video and posts to Depop and FB Marketplace simultaneously.</p>
-                <button className="pill pill-big" style={{ marginTop: '1rem' }}>See Studio</button>
-              </div>
-              <div className="slide-right slide-right--blend" style={{ background: 'var(--pink)' }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/images/blazer.avif" alt="Pink blazer styled listing" className="blend-img" />
-              </div>
-            </div>
-          </div>
-
-          {/* ─── SLIDE 4: CLOSER ─── */}
-          <div className={panelCls(4)} style={{ background: 'var(--yellow)' }}>
-            <div className="slide-split">
-              <div className="slide-left slide-left--yellow">
-                <div className="slide-step-label">04 / closer</div>
-                <h2 className="slide-h2">sold while<br />you sleep. <em>🤝</em></h2>
-                <p className="slide-p">Closer lives in your DMs. It scores every offer, writes the counter, and books the meetup from your calendar. You never type a single reply.</p>
-                <div className="dm-thread" style={{ marginTop: '1.5rem' }}>
-                  <div className="dm dm-buyer">&quot;is $50 your lowest for the coat?&quot;</div>
-                  <div className="dm dm-ai">I can do $62 — it&apos;s under market. Meet Saturday in Williamsburg? 🤝</div>
-                  <div className="dm dm-buyer">&quot;deal! saturday works 🙌&quot;</div>
-                </div>
-              </div>
-              <div className="slide-right slide-right--blend" style={{ background: 'var(--yellow)', position: 'relative' }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/images/polaroids.avif" alt="Fashion polaroids and jewellery" className="blend-img" />
-                <canvas ref={waveRef} width={280} height={44}
-                  style={{ position: 'absolute', bottom: '2.5rem', left: '50%', transform: 'translateX(-50%)', display: 'block' }} />
+        {/* ─── SLIDE 3: CLOSER (yellow) ─── */}
+        <div className={cls(3)} style={{ background: 'var(--yellow)' }}>
+          <div className="split">
+            <div className="sl sl--yellow">
+              <div className="step-lbl">03 / closer</div>
+              <h2 className="sl-h2">sold while<br />you sleep. <em>🤝</em></h2>
+              <p className="sl-p">Closer lives in your DMs. It scores every offer, counters automatically, and books the meetup from your calendar. You never type a reply.</p>
+              <div className="dm-thread" style={{ marginTop: '1.5rem' }}>
+                <div className="dm dm-b">&quot;is $50 your lowest?&quot;</div>
+                <div className="dm dm-a">I can do $62 — priced under market. Meet Saturday in Williamsburg? 🤝</div>
+                <div className="dm dm-b">&quot;deal! saturday works 🙌&quot;</div>
               </div>
             </div>
+            <div className="sr" style={{ background: 'var(--yellow)', position: 'relative' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/polaroids.avif" alt="Fashion polaroids" className="blend" />
+              <canvas ref={waveRef} width={260} height={44}
+                style={{ position: 'absolute', bottom: '2rem', left: '50%', transform: 'translateX(-50%)', display: 'block' }} />
+            </div>
           </div>
+        </div>
 
-          {/* ── Navigation (hidden on hero) ── */}
-          {slideIndex > 0 && (
-            <div className="slide-nav-bar">
-              <button
-                className="slide-arrow-btn"
-                onClick={() => goTo(slideIndex - 1)}
-                aria-label="Previous slide"
-                disabled={slideIndex === 0}
-              >
-                <CurlyLeft />
-                <span className="slide-arrow-label">back</span>
-              </button>
-
-              <div className="slide-progress">
-                {[1, 2, 3, 4].map(n => (
-                  <button
-                    key={n}
-                    className={`slide-prog-dot ${slideIndex === n ? 'active' : ''}`}
-                    onClick={() => { goTo(n); if (n !== 1) resetUpload() }}
-                    aria-label={`Go to slide ${n}`}
-                  />
+        {/* ─── SLIDE 4: STATS (near-white) ─── */}
+        <div className={cls(4)} style={{ background: '#F8F6F0' }}>
+          <div className="split">
+            {/* Left — live feed */}
+            <div className="sl sl--stats">
+              <div className="step-lbl">this week on reseller.</div>
+              <h2 className="sl-h2" style={{ marginBottom: '2rem' }}>
+                real sales,<br /><em>real people.</em> 📊
+              </h2>
+              <div className="feed">
+                {LIVE_FEED.map((f, i) => (
+                  <div key={i} className="feed-item" style={{ animationDelay: `${0.1 + i * 0.15}s` }}>
+                    <span className="feed-icon">{f.icon}</span>
+                    <span className="feed-body">
+                      <span className="feed-title">{f.title}</span>
+                      <span className="feed-meta">{f.price} · {f.platform}</span>
+                    </span>
+                    <span className="feed-time">{f.mins}m ago</span>
+                  </div>
                 ))}
               </div>
-
-              <button
-                className="slide-arrow-btn"
-                onClick={() => { goTo(slideIndex + 1); if (slideIndex === 0) resetUpload() }}
-                aria-label="Next slide"
-              >
-                <span className="slide-arrow-label">
-                  {slideIndex < SLIDE_COUNT - 1 ? 'next' : 'done ↓'}
-                </span>
-                <CurlyRight />
-              </button>
             </div>
-          )}
-
-        </div>{/* /sticky-stage */}
-      </div>{/* /scroll section */}
-
-      {/* ── REST OF PAGE (normal scroll) ── */}
-      <section className="agents-section" id="agents">
-        <div className="section-label">the pipeline</div>
-        <h2 className="big-head">three agents.<br /><em>one system.</em> 🤖</h2>
-        <div className="agents-grid">
-          {[
-            { icon: '🔍', cls: 'c-blue', num: '01', name: 'scout',  desc: 'Prices your item against live market data across every major resale platform before you post a single photo.', tags: ['Price Analysis','Demand Score','Comp Watch'] },
-            { icon: '🎬', cls: 'c-pink', num: '02', name: 'studio', desc: 'Writes the listing, generates a short product video, and posts everywhere simultaneously.', tags: ['Video Gen','SEO Copy','Auto-Post'] },
-            { icon: '🤝', cls: 'c-yell', num: '03', name: 'closer', desc: 'Lives in your DMs — scores offers, counters, books meetups from your calendar automatically.', tags: ['Auto-DM','Offer Scoring','Calendar Sync'] },
-          ].map(a => (
-            <div key={a.name} className="agent-card">
-              <div className={`orbit-circle ${a.cls}`}>{a.icon}<div className="ring" /></div>
-              <div><div className="agent-num">Agent {a.num}</div><div className="agent-name">{a.name}</div></div>
-              <p className="agent-p">{a.desc}</p>
-              <div className="chip-row">{a.tags.map(t => <span key={t} className="chip">{t}</span>)}</div>
+            {/* Right — animated stat counters */}
+            <div className="sr sr--stats">
+              <div className="stat-grid">
+                <div className="stat-block">
+                  <div className="stat-val">
+                    <AnimatedNum target={STATS.listed}     isActive={slide === 4} />
+                  </div>
+                  <div className="stat-lbl2">items listed this week</div>
+                </div>
+                <div className="stat-block">
+                  <div className="stat-val">
+                    <AnimatedNum target={STATS.revenue} prefix="$" isActive={slide === 4} />
+                  </div>
+                  <div className="stat-lbl2">in total sales</div>
+                </div>
+                <div className="stat-block">
+                  <div className="stat-val">
+                    <AnimatedNum target={STATS.avgHours * 10} isActive={slide === 4} suffix=" hrs" />
+                  </div>
+                  <div className="stat-lbl2">avg time to sell</div>
+                </div>
+                <div className="stat-block">
+                  <div className="stat-val">
+                    <AnimatedNum target={STATS.acceptance} isActive={slide === 4} suffix="%" />
+                  </div>
+                  <div className="stat-lbl2">offer acceptance rate</div>
+                </div>
+              </div>
+              <p className="stats-note">Live data from Supabase · updates every 5 min</p>
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="stats-section">
-        <div className="stat-cell"><div className="stat-num">3×</div><div className="stat-lbl">more listings per hour</div></div>
-        <div className="stat-cell"><div className="stat-num">0</div><div className="stat-lbl">DMs you ever type</div></div>
-        <div className="stat-cell"><div className="stat-num">↑24%</div><div className="stat-lbl">avg sale price with scout</div></div>
-      </section>
-
-      <section className="photo-section photo-section--cta">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/flatlay.avif" alt="Luxury resale items flatlay" className="fill-img photo-img" />
-        <div className="photo-overlay photo-overlay--pink" />
-        <div className="photo-content photo-content--center">
-          <h2 className="big-head" style={{ color: 'var(--white)', textAlign: 'center' }}>
-            your stuff,<br /><em style={{ color: 'var(--yellow)' }}>sold.</em> ✨<br />while you sleep.
-          </h2>
-          <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.9375rem', lineHeight: 1.65, maxWidth: 360, textAlign: 'center', margin: '0 auto 2.5rem' }}>
-            Join the waitlist. Opening platform by platform, starting with Depop and FB Marketplace.
-          </p>
-          <div className="cta-form">
-            <input id="cta-email" type="email" placeholder="your@email.com" aria-label="Email for waitlist" />
-            <button type="button">Join waitlist</button>
           </div>
-          <p className="cta-note">We will never save or store your location data.</p>
         </div>
-      </section>
 
-      <footer>
-        <a href="#" className="footer-logo">reseller.</a>
-        <span className="footer-r">Built at a hackathon · 2026</span>
-      </footer>
+        {/* ─── SLIDE 5: UPLOAD (white) ─── */}
+        <div className={cls(5)} style={{ background: '#fff' }}>
+          <div className="split">
+            {/* Left */}
+            <div className="sl sl--upload">
+              {uploadStep === 'idle' && <>
+                <div className="step-lbl">let&apos;s start.</div>
+                <h2 className="sl-h2">upload a photo<br />of your item. <em>📸</em></h2>
+                <p className="sl-p">Anything from your closet, haul, or shelf. Scout will have a price in seconds.</p>
+                <div
+                  className={`drop-zone ${dragOver ? 'dz--over' : ''}`}
+                  onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
+                  onClick={() => fileInputRef.current?.click()}
+                  role="button" tabIndex={0}
+                  onKeyDown={e => e.key === 'Enter' && fileInputRef.current?.click()}
+                >
+                  <span className="dz-icon">📷</span>
+                  <span className="dz-label">drag & drop or click to upload</span>
+                  <span className="dz-hint">jpg · png · webp</span>
+                </div>
+                <input ref={fileInputRef} type="file" accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+              </>}
+
+              {uploadStep === 'processing' && <>
+                <div className="step-lbl">agents working...</div>
+                <h2 className="sl-h2">analysing<br />your item. <em>⚡</em></h2>
+                <div className="agent-status-list">
+                  <AgentRow icon="🔍" name="Scout"  label="scanning live comps"     state={scout}  delay={0} />
+                  <AgentRow icon="🎬" name="Studio" label="writing listing + video" state={studio} delay={1} />
+                  <AgentRow icon="🤝" name="Closer" label="setting up DM replies"   state={closer} delay={2} />
+                </div>
+              </>}
+
+              {uploadStep === 'done' && <>
+                <div className="step-lbl">✅ done!</div>
+                <h2 className="sl-h2">your listing<br />is <em>live.</em> 🎉</h2>
+                <div className="result-card">
+                  <div className="rc-badge">✅ ready to push</div>
+                  <div className="rc-title">{item.title}</div>
+                  <div className="rc-row">
+                    <div>
+                      <div className="rc-price">${item.price}</div>
+                      <div className="rc-price-lbl">Scout&apos;s price</div>
+                    </div>
+                    <div className="rc-demand">
+                      <span className="rc-bar" style={{ '--pct': `${item.demand}%` } as React.CSSProperties} />
+                      <span className="rc-demand-lbl">{item.demand}% demand</span>
+                    </div>
+                  </div>
+                  <div className="chip-row" style={{ justifyContent: 'flex-start', marginTop: '0.75rem' }}>
+                    {item.tags.map(t => <span key={t} className="chip">{t}</span>)}
+                  </div>
+                </div>
+                <div className="rc-ctas">
+                  <button className="pill pill-big" style={{ background: 'var(--pink-2)' }}>Push live →</button>
+                  <button className="pill pill-big pill-outline" onClick={resetUpload}>Try another</button>
+                </div>
+              </>}
+            </div>
+
+            {/* Right — tips / preview */}
+            <div className="sr sr--upload">
+              {uploadStep === 'idle' && (
+                <div className="upload-idle-right">
+                  <span className="uir-icon">🏷️</span>
+                  <span className="uir-text">your item goes here</span>
+                </div>
+              )}
+
+              {(uploadStep === 'processing' || uploadStep === 'done') && uploadedImg && (
+                <div className="upload-preview-wrap">
+                  <div className="upload-preview-col">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={uploadedImg} alt="Your item" className="upload-img" />
+                    {uploadStep === 'done' && (
+                      <div className="upload-done-badge">listed on depop + fb 🎉</div>
+                    )}
+                  </div>
+                  <div className="tips-col">
+                    {tips.map((t, i) => (
+                      <div key={i} className="tip" style={{ animationDelay: `${i * 0.22}s` }}>{t}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Navigation bar (hidden on hero) ── */}
+        {slide > 0 && (
+          <div className={`snav ${slide >= 4 ? 'snav--dark' : ''}`}>
+            <button className="sarrow" onClick={() => goTo(slide - 1)} aria-label="Previous">
+              <CurlyLeft c={slide >= 4 ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.4)'} />
+              <span className="sarrow-lbl">back</span>
+            </button>
+            <div className="sdots">
+              {Array.from({ length: SLIDE_COUNT - 1 }, (_, i) => i + 1).map(n => (
+                <button key={n}
+                  className={`sdot ${slide === n ? 'sdot--on' : ''}`}
+                  onClick={() => { goTo(n); if (n !== 5) resetUpload() }}
+                  aria-label={`Slide ${n}`}
+                />
+              ))}
+            </div>
+            <button className="sarrow" onClick={() => goTo(slide + 1)} aria-label="Next">
+              <span className="sarrow-lbl">{slide < SLIDE_COUNT - 1 ? 'next' : 'done ↓'}</span>
+              <CurlyRight c="rgba(0,0,0,0.4)" />
+            </button>
+          </div>
+        )}
+
+      </div>{/* /stage */}
+
+      {/* ── REST OF PAGE ── */}
+      <div id="below-fold">
+        <div className="ticker-wrap" aria-hidden="true">
+          <div className="ticker-track">
+            {['upload your item','scout prices it','studio lists it','closer negotiates','depop + fb marketplace','supabase backend'].flatMap((t, i) => [
+              <span key={`a${i}`} className="tick">{t} <span className="tick-dot">●</span></span>,
+              <span key={`b${i}`} className="tick">{t} <span className="tick-dot">●</span></span>,
+            ])}
+          </div>
+        </div>
+
+        <section className="agents-section" id="agents">
+          <div className="section-label">the pipeline</div>
+          <h2 className="big-head">three agents.<br /><em>one system.</em> 🤖</h2>
+          <div className="agents-grid">
+            {[
+              { icon: '🔍', cls: 'c-blue', num: '01', name: 'scout',  desc: 'Prices your item against live market data across every major resale platform before you post.', tags: ['Price Analysis','Demand Score','Comp Watch'] },
+              { icon: '🎬', cls: 'c-pink', num: '02', name: 'studio', desc: 'Writes the listing, generates a short product video, and posts everywhere simultaneously.', tags: ['Video Gen','SEO Copy','Auto-Post'] },
+              { icon: '🤝', cls: 'c-yell', num: '03', name: 'closer', desc: 'Lives in your DMs. Scores offers, counters, and books meetups from your calendar.', tags: ['Auto-DM','Offer Scoring','Calendar Sync'] },
+            ].map(a => (
+              <div key={a.name} className="agent-card">
+                <div className={`orbit-circle ${a.cls}`}>{a.icon}<div className="ring" /></div>
+                <div><div className="agent-num">Agent {a.num}</div><div className="agent-name">{a.name}</div></div>
+                <p className="agent-p">{a.desc}</p>
+                <div className="chip-row">{a.tags.map(t => <span key={t} className="chip">{t}</span>)}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="photo-section photo-section--cta">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/flatlay.avif" alt="Luxury resale items" className="fill-img photo-img" />
+          <div className="photo-overlay photo-overlay--pink" />
+          <div className="photo-content photo-content--center">
+            <h2 className="big-head" style={{ color: 'var(--white)', textAlign: 'center' }}>
+              your stuff,<br /><em style={{ color: 'var(--yellow)' }}>sold.</em> ✨<br />while you sleep.
+            </h2>
+            <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.9375rem', lineHeight: 1.65, maxWidth: 360, textAlign: 'center', margin: '0 auto 2.5rem' }}>
+              Join the waitlist. Opening platform by platform, starting with Depop and FB Marketplace.
+            </p>
+            <div className="cta-form">
+              <input id="cta-email" type="email" placeholder="your@email.com" aria-label="Email for waitlist" />
+              <button type="button">Join waitlist</button>
+            </div>
+            <p className="cta-note">We will never save or store your location data.</p>
+          </div>
+        </section>
+
+        <footer>
+          <a href="#" className="footer-logo">reseller.</a>
+          <span className="footer-r">Built at a hackathon · 2026</span>
+        </footer>
+      </div>
     </>
-  )
-}
-
-function AgentRow({ icon, name, label, state, delay }: {
-  icon: string; name: string; label: string; state: AgentState; delay: number
-}) {
-  return (
-    <div className={`agent-row agent-row--${state}`} style={{ animationDelay: `${delay * 0.2}s` }}>
-      <div className="agent-row-icon">{icon}</div>
-      <div className="agent-row-body">
-        <span className="agent-row-name">{name}</span>
-        <span className="agent-row-label">{label}</span>
-      </div>
-      <div className="agent-row-status">
-        {state === 'idle'    && <span className="agent-dot agent-dot--idle" />}
-        {state === 'working' && <span className="agent-dot agent-dot--working" />}
-        {state === 'done'    && <span className="agent-check">✓</span>}
-      </div>
-    </div>
   )
 }
