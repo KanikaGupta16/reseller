@@ -1,119 +1,39 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import Image from 'next/image'
 
 export default function Home() {
-  const orbitRef = useRef<HTMLCanvasElement>(null)
-  const waveRef  = useRef<HTMLCanvasElement>(null)
-  const ctaRef   = useRef<HTMLCanvasElement>(null)
+  const waveRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
-    let id1: number, id2: number, id3: number
-
-    /* ── orbit canvas ── */
-    const oc = orbitRef.current
-    if (oc) {
-      const ctx = oc.getContext('2d')!
-      const items = [
-        { emoji: '👟', color: '#A9D8F2', r: 130, angle: 0,   speed: 0.005,  size: 56 },
-        { emoji: '👖', color: '#F2AACD', r: 200, angle: 2.1, speed: -0.004, size: 64 },
-        { emoji: '📷', color: '#FFE24A', r: 90,  angle: 1.2, speed: 0.007,  size: 48 },
-        { emoji: '👜', color: '#F2AACD', r: 260, angle: 4.0, speed: 0.003,  size: 72 },
-        { emoji: '🧥', color: '#A9D8F2', r: 160, angle: 3.3, speed: -0.006, size: 52 },
-      ]
-      const resize = () => { oc.width = oc.offsetWidth; oc.height = oc.offsetHeight }
-      resize()
-      window.addEventListener('resize', resize)
-
-      const draw = () => {
-        const { width: w, height: h } = oc
-        ctx.clearRect(0, 0, w, h)
-        const cx = w * 0.45, cy = h * 0.5
-        items.forEach(it => {
-          ctx.beginPath(); ctx.arc(cx, cy, it.r, 0, Math.PI * 2)
-          ctx.strokeStyle = 'rgba(0,0,0,0.045)'; ctx.lineWidth = 1; ctx.stroke()
-        })
-        items.forEach(it => {
-          const x = cx + Math.cos(it.angle) * it.r
-          const y = cy + Math.sin(it.angle) * it.r
-          ctx.beginPath(); ctx.arc(x, y, it.size / 2, 0, Math.PI * 2)
-          ctx.fillStyle = it.color; ctx.shadowColor = it.color; ctx.shadowBlur = 18
-          ctx.fill(); ctx.shadowBlur = 0
-          ctx.font = `${it.size * 0.52}px serif`
-          ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-          ctx.fillText(it.emoji, x, y + 1)
-          it.angle += it.speed
-        })
-        id1 = requestAnimationFrame(draw)
-      }
-      draw()
-      return () => window.removeEventListener('resize', resize)
-    }
-
-    /* ── waveform canvas ── */
+    let id: number
     const wc = waveRef.current
-    if (wc) {
-      const wctx = wc.getContext('2d')!
-      const N = 48
-      const heights = Array.from({ length: N }, (_, i) => 6 + Math.abs(Math.sin(i * 0.55)) * 38)
-      const speeds  = Array.from({ length: N }, () => 0.03 + Math.random() * 0.04)
-      const offsets = Array.from({ length: N }, (_, i) => i * 0.32)
-      const drawWave = (ts: number) => {
-        const T = ts / 1000
-        wctx.clearRect(0, 0, wc.width, wc.height)
-        const barW = 4, gap = 3.5, totalW = N * (barW + gap) - gap
-        const startX = (wc.width - totalW) / 2, cy = wc.height / 2
-        for (let i = 0; i < N; i++) {
-          const h = heights[i] * (0.35 + 0.65 * Math.abs(Math.sin(T * speeds[i] + offsets[i])))
-          const x = startX + i * (barW + gap)
-          const alpha = 0.4 + 0.6 * (h / heights[i])
-          wctx.fillStyle = `rgba(232,117,187,${alpha})`
-          wctx.beginPath()
-          wctx.roundRect(x, cy - h / 2, barW, h, 100)
-          wctx.fill()
-        }
-        id2 = requestAnimationFrame(drawWave)
-      }
-      id2 = requestAnimationFrame(drawWave)
-    }
+    if (!wc) return
+    const ctx = wc.getContext('2d')!
+    const N = 48
+    const heights = Array.from({ length: N }, (_, i) => 4 + Math.abs(Math.sin(i * 0.55)) * 26)
+    const speeds  = Array.from({ length: N }, () => 0.03 + Math.random() * 0.04)
+    const offsets = Array.from({ length: N }, (_, i) => i * 0.32)
 
-    /* ── cta canvas ── */
-    const cc = ctaRef.current
-    if (cc) {
-      const cctx = cc.getContext('2d')!
-      const circles = [
-        { x: 0.1,  y: 0.2,  r: 90,  speed: 0.003  },
-        { x: 0.85, y: 0.15, r: 130, speed: -0.002 },
-        { x: 0.75, y: 0.8,  r: 80,  speed: 0.004  },
-        { x: 0.2,  y: 0.85, r: 110, speed: -0.003 },
-        { x: 0.5,  y: 0.1,  r: 60,  speed: 0.005  },
-      ]
-      const resize2 = () => { cc.width = cc.offsetWidth; cc.height = cc.offsetHeight }
-      resize2()
-      window.addEventListener('resize', resize2)
-      let t = 0
-      const drawCta = () => {
-        t += 0.01
-        const { width: w, height: h } = cc
-        cctx.clearRect(0, 0, w, h)
-        circles.forEach((c, i) => {
-          const ox = Math.sin(t * c.speed * 80 + i) * 28
-          const oy = Math.cos(t * c.speed * 60 + i) * 20
-          cctx.beginPath(); cctx.arc(c.x * w + ox, c.y * h + oy, c.r, 0, Math.PI * 2)
-          cctx.fillStyle = 'rgba(255,255,255,0.22)'; cctx.fill()
-        })
-        id3 = requestAnimationFrame(drawCta)
+    const draw = (ts: number) => {
+      const T = ts / 1000
+      ctx.clearRect(0, 0, wc.width, wc.height)
+      const bW = 3, gap = 3, tot = N * (bW + gap) - gap
+      const sx = (wc.width - tot) / 2, cy = wc.height / 2
+      for (let i = 0; i < N; i++) {
+        const h = heights[i] * (0.3 + 0.7 * Math.abs(Math.sin(T * speeds[i] + offsets[i])))
+        const x = sx + i * (bW + gap)
+        const a = 0.5 + 0.5 * (h / heights[i])
+        ctx.fillStyle = `rgba(242,170,205,${a})`
+        ctx.beginPath()
+        if (ctx.roundRect) ctx.roundRect(x, cy - h / 2, bW, h, 100)
+        else ctx.rect(x, cy - h / 2, bW, h)
+        ctx.fill()
       }
-      drawCta()
-      return () => window.removeEventListener('resize', resize2)
+      id = requestAnimationFrame(draw)
     }
-
-    return () => {
-      cancelAnimationFrame(id1)
-      cancelAnimationFrame(id2)
-      cancelAnimationFrame(id3)
-    }
+    id = requestAnimationFrame(draw)
+    return () => cancelAnimationFrame(id)
   }, [])
 
   const scrollToCta = () => document.getElementById('cta-email')?.focus()
@@ -123,14 +43,14 @@ export default function Home() {
       {/* NAV */}
       <nav className="nav">
         <a href="#" className="logo">reseller.</a>
-        <button className="pill" onClick={scrollToCta}>get access</button>
+        <button className="pill" onClick={scrollToCta}>Get Access</button>
       </nav>
 
-      {/* HERO — clothes pile = the problem */}
+      {/* ① HERO — clothes pile */}
       <section className="hero">
         <div className="hero-left">
           <div className="hero-badge">
-            <span className="hero-badge-dot" />
+            <span className="badge-dot" />
             AI-Powered Reselling · Now in Beta
           </div>
           <h1>
@@ -139,134 +59,153 @@ export default function Home() {
             waiting. 💸
           </h1>
           <p className="hero-sub">
-            <strong>Scout</strong> prices it. <strong>Studio</strong> lists it with a video.{' '}
-            <strong>Closer</strong> handles every DM — offers, meetups, all of it.
+            Please allow <strong>Scout</strong>, <strong>Studio</strong> &amp; <strong>Closer</strong> to turn your stuff into cash — automatically.
           </p>
           <div className="hero-ctas">
-            <button className="pill big" onClick={scrollToCta}>Join waitlist</button>
-            <button className="pill outline big" onClick={() => document.getElementById('agents')?.scrollIntoView({behavior:'smooth'})}>See how</button>
+            <button className="pill pill-big" onClick={scrollToCta}>Join Waitlist</button>
+            <button className="pill pill-big pill-outline" onClick={() => document.getElementById('agents')?.scrollIntoView({ behavior: 'smooth' })}>See How</button>
           </div>
-          <p className="hero-footnote">We will never save or store your listing data.</p>
+          <p className="hero-fine">We will never save or store your location data.</p>
         </div>
         <div className="hero-right">
-          <Image src="/images/closet.avif" alt="A reseller surrounded by a massive pile of clothes" fill className="hero-photo" style={{objectFit:'cover',objectPosition:'center top'}} />
-          <div className="hero-overlay" />
-          <div className="hero-tag">before reseller.</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/closet.avif" alt="A reseller surrounded by a massive pile of clothes" className="fill-img" />
+          <div className="hero-right-overlay" />
+          <span className="hero-tag">before reseller.</span>
         </div>
       </section>
 
       {/* TICKER */}
       <div className="ticker-wrap" aria-hidden="true">
         <div className="ticker-track">
-          {['market research','video generation','auto-listing','offer handling','calendar sync','depop + fb marketplace','supabase backend'].flatMap((t, i) => [
+          {['market research','video generation','auto-listing','offer handling','calendar sync','depop + fb marketplace'].flatMap((t, i) => [
             <span key={`a${i}`} className="tick">{t} <span className="tick-dot">●</span></span>,
             <span key={`b${i}`} className="tick">{t} <span className="tick-dot">●</span></span>,
           ])}
         </div>
       </div>
 
-      {/* FLATLAY SPLIT — Scout */}
-      <div className="split-row">
-        <div className="split-photo">
-          <Image src="/images/flatlay.avif" alt="Luxury resale items: quilted bag, sunglasses, watch, rings" fill style={{objectFit:'cover'}} />
-          <div className="split-overlay" />
-        </div>
-        <div className="split-text">
-          <div className="section-label">Agent 01 — Scout</div>
-          <h2 className="big-head">priced before<br />you post. <em>always.</em></h2>
-          <p className="section-sub">Scout scans live comps on Depop, FB Marketplace, and eBay to find the exact price that sells fast — not the one that sits for months.</p>
-          <div className="chip-row" style={{justifyContent:'flex-start',gap:'0.5rem'}}>
-            <span className="chip">Live comp scan</span>
-            <span className="chip">Demand score</span>
-            <span className="chip">Price reasoning</span>
+      {/* ② SNEAKER — Scout */}
+      <section className="photo-section">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/sneaker.avif" alt="Person holding Nike Air Jordan sneakers" className="fill-img photo-img" />
+        <div className="photo-overlay photo-overlay--bottom" />
+        <div className="photo-content photo-content--split">
+          <div className="photo-text">
+            <div className="section-label">Agent 01 — Scout</div>
+            <h2 className="big-head" style={{ color: 'var(--white)' }}>
+              priced before<br />you post. <em style={{ color: 'var(--pink-2)' }}>always.</em>
+            </h2>
+            <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.9375rem', lineHeight: 1.65, maxWidth: 400 }}>
+              Scout scans live comps on Depop, eBay, and FB Marketplace to find the price that actually sells.
+            </p>
           </div>
-        </div>
-      </div>
-
-      {/* AGENTS */}
-      <section className="agents-section" id="agents">
-        <div className="agents-inner">
-          <div className="agents-header">
-            <div className="section-label">the pipeline</div>
-            <h2 className="big-head">three agents.<br /><em>one system.</em> 🤖</h2>
-          </div>
-          <div className="agents-grid">
-            {[
-              { icon: '🔍', color: 'c-blue', num: '01', name: 'scout', desc: 'Prices your item against live market data across every major resale platform before you post a single photo.', tags: ['Price Analysis','Demand Score','Comp Watch'] },
-              { icon: '🎬', color: 'c-pink', num: '02', name: 'studio', desc: 'Writes the title, description, and tags. Generates a short product video. Posts everywhere simultaneously.', tags: ['Video Gen','SEO Copy','Auto-Post','Supabase'] },
-              { icon: '🤝', color: 'c-yell', num: '03', name: 'closer', desc: 'Lives in your DMs. Scores every offer, counters when needed, books the meetup from your calendar automatically.', tags: ['Auto-DM','Offer Scoring','Calendar Sync'] },
-            ].map(a => (
-              <div key={a.name} className="agent-card">
-                <div className={`orbit-circle ${a.color}`}>{a.icon}<div className="ring" /></div>
-                <div><div className="agent-role-label">Agent {a.num}</div><div className="agent-title">{a.name}</div></div>
-                <p className="agent-p">{a.desc}</p>
-                <div className="chip-row">{a.tags.map(t => <span key={t} className="chip">{t}</span>)}</div>
-              </div>
-            ))}
+          <div className="photo-aside">
+            <div className="price-badge">$187 <span className="price-label">Scout says</span></div>
+            <button className="pill pill-big pill-outline-w">See Scout in action</button>
           </div>
         </div>
       </section>
 
-      {/* BLAZER FULL-BLEED — Studio */}
-      <section className="blazer-section">
-        <Image src="/images/blazer.avif" alt="Pink blazer on a rack with black boots — a styled listing" fill className="blazer-bg" style={{objectFit:'cover',filter:'brightness(0.75) saturate(1.1)'}} />
-        <div className="blazer-overlay" />
-        <div className="blazer-content">
-          <div className="section-label">Agent 02 — Studio</div>
-          <h2 className="big-head" style={{color:'var(--white)'}}>studio<br /><em style={{color:'var(--pink)'}}>creates.</em> 🎬</h2>
-          <p>Snap three photos. Studio writes a listing, generates a 15-second product video, and posts it across every platform — all before you put your phone down.</p>
-          <button className="pill pink-pill big">See studio in action</button>
+      {/* ③ AGENTS */}
+      <section className="agents-section" id="agents">
+        <div className="section-label">the pipeline</div>
+        <h2 className="big-head">three agents.<br /><em>one system.</em> 🤖</h2>
+        <div className="agents-grid">
+          {[
+            { icon: '🔍', cls: 'c-blue',  num: '01', name: 'scout',  desc: 'Prices your item against live market data across every major resale platform before you post a single photo.', tags: ['Price Analysis','Demand Score','Comp Watch'] },
+            { icon: '🎬', cls: 'c-pink',  num: '02', name: 'studio', desc: 'Writes the listing, generates a short product video, and posts everywhere simultaneously.', tags: ['Video Gen','SEO Copy','Auto-Post','Supabase'] },
+            { icon: '🤝', cls: 'c-yell',  num: '03', name: 'closer', desc: 'Lives in your DMs. Scores every offer, counters when needed, books the meetup from your calendar automatically.', tags: ['Auto-DM','Offer Scoring','Calendar Sync'] },
+          ].map(a => (
+            <div key={a.name} className="agent-card">
+              <div className={`orbit-circle ${a.cls}`}>{a.icon}<div className="ring" /></div>
+              <div><div className="agent-num">Agent {a.num}</div><div className="agent-name">{a.name}</div></div>
+              <p className="agent-p">{a.desc}</p>
+              <div className="chip-row">{a.tags.map(t => <span key={t} className="chip">{t}</span>)}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ④ BLAZER — Studio */}
+      <section className="photo-section">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/blazer.avif" alt="Hot pink blazer on a rack" className="fill-img photo-img" />
+        <div className="photo-overlay photo-overlay--left" />
+        <div className="photo-content photo-content--left">
+          <div className="section-label" style={{ color: 'rgba(255,255,255,0.45)' }}>Agent 02 — Studio</div>
+          <h2 className="big-head" style={{ color: 'var(--white)' }}>
+            studio<br /><em style={{ color: 'var(--pink-2)' }}>creates.</em> 🎬
+          </h2>
+          <p style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.9375rem', lineHeight: 1.65, maxWidth: 420, marginBottom: '2rem' }}>
+            Snap three photos. Studio writes a listing, generates a 15-second product video, and posts it across every platform.
+          </p>
+          <button className="pill pill-big" style={{ background: 'var(--pink-2)' }}>See Studio in action</button>
         </div>
         <div className="phone-wrap">
           <div className="phone">
             <div className="phone-pill" />
             <div className="phone-screen">
-              <div className="phone-status">● Studio · Generating video...</div>
+              <div className="phone-status">● Studio · Generating...</div>
               <div className="phone-item">🧥</div>
-              <div className="phone-prog-wrap"><div className="phone-prog" /></div>
+              <div className="phone-prog-w"><div className="phone-prog" /></div>
               <div className="phone-copy">&quot;Hot pink blazer, perfect condition. Worn once. Fits a size 6–8.&quot;</div>
               <div className="phone-tags">
-                <span className="phone-tag">vintage</span>
-                <span className="phone-tag">blazer</span>
-                <span className="phone-tag">y2k</span>
-                <span className="phone-tag">pink</span>
+                {['vintage','blazer','y2k','pink'].map((t, i) => (
+                  <span key={t} className="phone-tag" style={{ animationDelay: `${1.5 + i * 0.4}s` }}>{t}</span>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* CLOSER */}
-      <section className="closer-section" id="closer">
-        <div className="closer-ring closer-ring-1" />
-        <div className="closer-ring closer-ring-2" />
-        <div className="closer-ring closer-ring-3" />
-        <div className="closer-inner">
-          <div className="section-label" style={{color:'rgba(255,255,255,0.35)'}}>agent 03</div>
-          <h2 className="big-head">closer<br /><em style={{color:'var(--pink-2)'}}>negotiates.</em> 💬</h2>
-          <p className="closer-sub">Every offer, handled. Closer reads the message, scores the deal, writes the counter — and books the meetup from your actual calendar.</p>
-          <div className="dm-thread">
-            <div className="dm buyer">&quot;hey is $50 the lowest you can go on the coat?&quot;</div>
-            <div className="dm ai">I can do $62 — it&apos;s priced under comps and in excellent condition. Want to meet Saturday afternoon in Williamsburg? 🤝</div>
-            <div className="dm buyer">&quot;deal! saturday works&quot;</div>
+      {/* ⑤ POLAROIDS — Closer */}
+      <section className="photo-section photo-section--tall">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/polaroids.avif" alt="Fashion polaroid photos and jewelry" className="fill-img photo-img" />
+        <div className="photo-overlay photo-overlay--full" />
+        <div className="photo-content photo-content--bottom-split">
+          <div>
+            <div className="section-label" style={{ color: 'rgba(255,255,255,0.45)' }}>Agent 03 — Closer</div>
+            <h2 className="big-head" style={{ color: 'var(--white)' }}>
+              closer<br /><em style={{ color: 'var(--pink-2)' }}>negotiates.</em> 💬
+            </h2>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.9rem', lineHeight: 1.65, maxWidth: 380, marginBottom: '1.75rem' }}>
+              Every offer handled. Closer reads the message, scores the deal, writes the counter — and books the meetup from your calendar.
+            </p>
+            <button className="pill pill-big" onClick={scrollToCta}>Start for free</button>
           </div>
-          <canvas ref={waveRef} className="wave-canvas" width={360} height={80} />
+          <div>
+            <div className="dm-thread">
+              <div className="dm dm-buyer">&quot;hey is $50 the lowest you can go?&quot;</div>
+              <div className="dm dm-ai">I can do $62 — priced under comps. Meet Saturday in Williamsburg? 🤝</div>
+              <div className="dm dm-buyer">&quot;deal! saturday works 🙌&quot;</div>
+            </div>
+            <canvas ref={waveRef} width={340} height={52} style={{ display: 'block', marginTop: '1.5rem' }} />
+          </div>
         </div>
       </section>
 
-      {/* STATS */}
-      <section className="stats-section" aria-label="Stats">
-        <div className="stat-cell"><div className="stat-num-big">3×</div><div className="stat-label-sm">more listings per hour</div></div>
-        <div className="stat-cell"><div className="stat-num-big">0</div><div className="stat-label-sm">DMs you ever type</div></div>
-        <div className="stat-cell"><div className="stat-num-big">↑24%</div><div className="stat-label-sm">avg sale price with scout</div></div>
+      {/* ⑥ STATS */}
+      <section className="stats-section">
+        <div className="stat-cell"><div className="stat-num">3×</div><div className="stat-lbl">more listings per hour</div></div>
+        <div className="stat-cell"><div className="stat-num">0</div><div className="stat-lbl">DMs you ever type</div></div>
+        <div className="stat-cell"><div className="stat-num">↑24%</div><div className="stat-lbl">avg sale price with scout</div></div>
       </section>
 
-      {/* CTA */}
-      <section className="cta-section">
-        <canvas ref={ctaRef} className="cta-canvas" />
-        <div className="cta-inner">
-          <h2>your stuff,<br /><em>sold.</em> ✨<br />while you sleep.</h2>
-          <p className="cta-p">Join the waitlist. We&apos;re opening access platform by platform, starting with Depop and FB Marketplace.</p>
+      {/* ⑦ FLATLAY — CTA */}
+      <section className="photo-section photo-section--cta">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/images/flatlay.avif" alt="Luxury resale items flatlay" className="fill-img photo-img" />
+        <div className="photo-overlay photo-overlay--pink" />
+        <div className="photo-content photo-content--center">
+          <h2 className="big-head" style={{ color: 'var(--white)', textAlign: 'center' }}>
+            your stuff,<br /><em style={{ color: 'var(--yellow)' }}>sold.</em> ✨<br />while you sleep.
+          </h2>
+          <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.9375rem', lineHeight: 1.65, maxWidth: 360, textAlign: 'center', margin: '0 auto 2.5rem' }}>
+            Join the waitlist. Opening access platform by platform, starting with Depop and FB Marketplace.
+          </p>
           <div className="cta-form">
             <input id="cta-email" type="email" placeholder="your@email.com" aria-label="Email for waitlist" />
             <button type="button">Join waitlist</button>
