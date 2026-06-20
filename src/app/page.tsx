@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import Image from 'next/image'
 
 export default function Home() {
   const orbitRef = useRef<HTMLCanvasElement>(null)
@@ -125,32 +126,32 @@ export default function Home() {
         <button className="pill" onClick={scrollToCta}>get access</button>
       </nav>
 
-      {/* HERO */}
+      {/* HERO — clothes pile = the problem */}
       <section className="hero">
-        <div className="blob blob-1" />
-        <div className="blob blob-2" />
         <div className="hero-left">
           <div className="hero-badge">
             <span className="hero-badge-dot" />
-            AI-Powered · Depop &amp; FB Marketplace
+            AI-Powered Reselling · Now in Beta
           </div>
           <h1>
-            list it.<br />
-            <em>close it.</em><br />
-            repeat. 🏷️
+            your pile<br />
+            is <em>money</em><br />
+            waiting. 💸
           </h1>
           <p className="hero-sub">
-            <strong>Scout</strong> prices the market. <strong>Studio</strong> shoots the listing and drops the video.{' '}
-            <strong>Closer</strong> handles every DM — offers, meetups, the works.
+            <strong>Scout</strong> prices it. <strong>Studio</strong> lists it with a video.{' '}
+            <strong>Closer</strong> handles every DM — offers, meetups, all of it.
           </p>
           <div className="hero-ctas">
             <button className="pill big" onClick={scrollToCta}>Join waitlist</button>
-            <button className="pill outline big">See how it works</button>
+            <button className="pill outline big" onClick={() => document.getElementById('agents')?.scrollIntoView({behavior:'smooth'})}>See how</button>
           </div>
           <p className="hero-footnote">We will never save or store your listing data.</p>
         </div>
         <div className="hero-right">
-          <canvas ref={orbitRef} className="orbit-canvas" />
+          <Image src="/images/closet.avif" alt="A reseller surrounded by a massive pile of clothes" fill className="hero-photo" style={{objectFit:'cover',objectPosition:'center top'}} />
+          <div className="hero-overlay" />
+          <div className="hero-tag">before reseller.</div>
         </div>
       </section>
 
@@ -164,56 +165,71 @@ export default function Home() {
         </div>
       </div>
 
+      {/* FLATLAY SPLIT — Scout */}
+      <div className="split-row">
+        <div className="split-photo">
+          <Image src="/images/flatlay.avif" alt="Luxury resale items: quilted bag, sunglasses, watch, rings" fill style={{objectFit:'cover'}} />
+          <div className="split-overlay" />
+        </div>
+        <div className="split-text">
+          <div className="section-label">Agent 01 — Scout</div>
+          <h2 className="big-head">priced before<br />you post. <em>always.</em></h2>
+          <p className="section-sub">Scout scans live comps on Depop, FB Marketplace, and eBay to find the exact price that sells fast — not the one that sits for months.</p>
+          <div className="chip-row" style={{justifyContent:'flex-start',gap:'0.5rem'}}>
+            <span className="chip">Live comp scan</span>
+            <span className="chip">Demand score</span>
+            <span className="chip">Price reasoning</span>
+          </div>
+        </div>
+      </div>
+
       {/* AGENTS */}
       <section className="agents-section" id="agents">
-        <div className="section-label">the pipeline</div>
-        <h2 className="big-head">three agents.<br /><em>one system.</em> 🤖</h2>
-        <p className="section-sub">Each agent owns a phase. Together they take an item from your hands to sold — automatically.</p>
-        <div className="agents-grid">
-          {[
-            { icon: '🔍', color: 'c-blue', num: '01', name: 'scout', role: 'Market Research Agent', desc: 'Scans live Depop, FB Marketplace, and eBay listings to find your item\'s sweet-spot price — before you post a single photo.', tags: ['Price Analysis','Competitor Watch','Demand Score'] },
-            { icon: '🎬', color: 'c-pink', num: '02', name: 'studio', role: 'Content Agent', desc: 'Writes the title, description, and tags. Generates a short product video. Posts to every platform simultaneously and logs it to Supabase.', tags: ['Video Gen','SEO Copy','Auto-Post','Supabase'] },
-            { icon: '🤝', color: 'c-yell', num: '03', name: 'closer', role: 'Negotiation Agent', desc: 'Lives in your DMs. Scores every offer, counters when needed, and confirms meetup details straight from your calendar — no typing required.', tags: ['Auto-DM','Offer Scoring','Calendar Sync','Meetup Confirm'] },
-          ].map(a => (
-            <div key={a.name} className="agent-card">
-              <div className={`orbit-circle ${a.color}`}>
-                {a.icon}
-                <div className="ring" />
+        <div className="agents-inner">
+          <div className="agents-header">
+            <div className="section-label">the pipeline</div>
+            <h2 className="big-head">three agents.<br /><em>one system.</em> 🤖</h2>
+          </div>
+          <div className="agents-grid">
+            {[
+              { icon: '🔍', color: 'c-blue', num: '01', name: 'scout', desc: 'Prices your item against live market data across every major resale platform before you post a single photo.', tags: ['Price Analysis','Demand Score','Comp Watch'] },
+              { icon: '🎬', color: 'c-pink', num: '02', name: 'studio', desc: 'Writes the title, description, and tags. Generates a short product video. Posts everywhere simultaneously.', tags: ['Video Gen','SEO Copy','Auto-Post','Supabase'] },
+              { icon: '🤝', color: 'c-yell', num: '03', name: 'closer', desc: 'Lives in your DMs. Scores every offer, counters when needed, books the meetup from your calendar automatically.', tags: ['Auto-DM','Offer Scoring','Calendar Sync'] },
+            ].map(a => (
+              <div key={a.name} className="agent-card">
+                <div className={`orbit-circle ${a.color}`}>{a.icon}<div className="ring" /></div>
+                <div><div className="agent-role-label">Agent {a.num}</div><div className="agent-title">{a.name}</div></div>
+                <p className="agent-p">{a.desc}</p>
+                <div className="chip-row">{a.tags.map(t => <span key={t} className="chip">{t}</span>)}</div>
               </div>
-              <div>
-                <div className="agent-role-label">Agent {a.num}</div>
-                <div className="agent-title">{a.name}</div>
-              </div>
-              <p className="agent-p">{a.desc}</p>
-              <div className="chip-row">{a.tags.map(t => <span key={t} className="chip">{t}</span>)}</div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* STUDIO */}
-      <section className="studio-section">
-        <div className="studio-text">
-          <div className="section-label">agent 02</div>
-          <h2 className="big-head">studio<br /><em>creates.</em> 🎬</h2>
-          <p>Snap three photos. Studio writes a listing, generates a 15-second product video, and posts it across every platform — all before you&apos;ve put your phone down.</p>
-          <button className="pill big">See studio in action</button>
+      {/* BLAZER FULL-BLEED — Studio */}
+      <section className="blazer-section">
+        <Image src="/images/blazer.avif" alt="Pink blazer on a rack with black boots — a styled listing" fill className="blazer-bg" style={{objectFit:'cover',filter:'brightness(0.75) saturate(1.1)'}} />
+        <div className="blazer-overlay" />
+        <div className="blazer-content">
+          <div className="section-label">Agent 02 — Studio</div>
+          <h2 className="big-head" style={{color:'var(--white)'}}>studio<br /><em style={{color:'var(--pink)'}}>creates.</em> 🎬</h2>
+          <p>Snap three photos. Studio writes a listing, generates a 15-second product video, and posts it across every platform — all before you put your phone down.</p>
+          <button className="pill pink-pill big">See studio in action</button>
         </div>
-        <div className="studio-visual">
-          <div className="studio-bg-circle" style={{width:480,height:480,top:'50%',left:'50%',transform:'translate(-50%,-50%)',animation:'slowSpin 25s linear infinite'}} />
-          <div className="studio-bg-circle" style={{width:340,height:340,top:'50%',left:'50%',transform:'translate(-50%,-50%)',animation:'slowSpin 18s linear infinite reverse'}} />
+        <div className="phone-wrap">
           <div className="phone">
             <div className="phone-pill" />
             <div className="phone-screen">
               <div className="phone-status">● Studio · Generating video...</div>
-              <div className="phone-item">👟</div>
-              <div className="phone-progress-wrap"><div className="phone-progress" /></div>
-              <div className="phone-copy">&quot;Nike Air Max 90 in great condition.<br />Size 10. No box. Depop-era gem.&quot;</div>
+              <div className="phone-item">🧥</div>
+              <div className="phone-prog-wrap"><div className="phone-prog" /></div>
+              <div className="phone-copy">&quot;Hot pink blazer, perfect condition. Worn once. Fits a size 6–8.&quot;</div>
               <div className="phone-tags">
                 <span className="phone-tag">vintage</span>
-                <span className="phone-tag">nike</span>
-                <span className="phone-tag">sneakers</span>
+                <span className="phone-tag">blazer</span>
                 <span className="phone-tag">y2k</span>
+                <span className="phone-tag">pink</span>
               </div>
             </div>
           </div>
