@@ -280,11 +280,7 @@ export default function Home() {
       <nav className={`nav ${slide === 0 ? 'nav--dark' : 'nav--light'}`}>
         <a href="#" className="logo">reseller.</a>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          {process.env.NODE_ENV === 'development' && (
-            <a href="http://localhost:5173" target="_blank" rel="noopener noreferrer" className="dashboard-btn">
-              Dashboard
-            </a>
-          )}
+          <a href="/dashboard" className="dashboard-btn">Dashboard</a>
           <button className={`pill ${slide === 0 ? 'pill-white' : ''}`} onClick={scrollToCta}>
             Get Access
           </button>
