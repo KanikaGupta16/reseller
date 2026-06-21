@@ -1,12 +1,20 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+const EDGE_FN = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-item`
 
 /* ─────────────────────────────────────────────────────────────────────── */
 /*  Constants & mock data                                                   */
 /* ─────────────────────────────────────────────────────────────────────── */
 
-const SLIDE_COUNT = 6   // 0=hero 1=scout 2=studio 3=closer 4=stats 5=upload
+const SLIDE_COUNT = 5   // 0=hero 1=scout 2=studio 3=closer 4=upload
 
 const MOCK_ITEMS = [
   { title: "Vintage Levi's 501 Jeans",  price: 68,  demand: 94, tags: ['vintage','denim','y2k'] },
@@ -34,19 +42,19 @@ const CLOSER_TIPS = ['🤝 Configuring Closer...','✓ Offer scoring ready','�
 /*  SVG Curly arrows                                                        */
 /* ─────────────────────────────────────────────────────────────────────── */
 const CurlyRight = ({ c = 'currentColor' }: { c?: string }) => (
-  <svg width="52" height="30" viewBox="0 0 52 30" fill="none">
+  <svg width="78" height="46" viewBox="0 0 52 30" fill="none">
     <path d="M3 19 C7 5 26 1 42 13" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
     <path d="M36 7 L42 13 L35 18" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 )
 const CurlyLeft = ({ c = 'currentColor' }: { c?: string }) => (
-  <svg width="52" height="30" viewBox="0 0 52 30" fill="none">
+  <svg width="78" height="46" viewBox="0 0 52 30" fill="none">
     <path d="M49 19 C45 5 26 1 10 13" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
     <path d="M16 7 L10 13 L17 18" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 )
 const CurlyDown = ({ c = 'currentColor' }: { c?: string }) => (
-  <svg width="28" height="50" viewBox="0 0 28 50" fill="none">
+  <svg width="42" height="74" viewBox="0 0 28 50" fill="none">
     <path d="M9 3 C23 7 27 26 15 43" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
     <path d="M9 36 L15 43 L21 36" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
@@ -115,6 +123,8 @@ export default function Home() {
   const [studio, setStudio]         = useState<AgentState>('idle')
   const [closer, setCloser]         = useState<AgentState>('idle')
   const [item]                      = useState(() => MOCK_ITEMS[Math.floor(Math.random() * MOCK_ITEMS.length)])
+  const [realItem, setRealItem]     = useState<{ title: string; tags: string[] } | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
 
   /* waveform canvas */
   useEffect(() => {
@@ -141,6 +151,15 @@ export default function Home() {
     }
     id = requestAnimationFrame(draw)
     return () => cancelAnimationFrame(id)
+  }, [])
+
+  /* ─── anonymous auth ─── */
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session) { setAccessToken(session.access_token); return }
+      const { data } = await supabase.auth.signInAnonymously()
+      if (data.session) setAccessToken(data.session.access_token)
+    })
   }, [])
 
   /* ─── wheel intercept ─── */
@@ -194,26 +213,52 @@ export default function Home() {
   }, [goTo])
 
   /* ─── upload flow ─── */
-  const runProcessing = useCallback((img: string) => {
-    setUploadedImg(img)
+  const handleFile = useCallback(async (file: File) => {
+    if (!file.type.startsWith('image/')) return
+
+    // Show local preview immediately
+    const reader = new FileReader()
+    reader.onload = e => setUploadedImg(e.target?.result as string)
+    reader.readAsDataURL(file)
+
+    setRealItem(null)
     setScout('idle'); setStudio('idle'); setCloser('idle')
     setUploadStep('processing')
-    setTimeout(() => setScout('working'), 200)
-    setTimeout(() => { setScout('done'); setStudio('working') }, 1800)
-    setTimeout(() => { setStudio('done'); setCloser('working') }, 3200)
-    setTimeout(() => setCloser('done'), 4400)
-    setTimeout(() => setUploadStep('done'), 4900)
-  }, [])
+    setScout('working')
 
-  const handleFile = useCallback((file: File) => {
-    if (!file.type.startsWith('image/')) return
-    const r = new FileReader()
-    r.onload = e => runProcessing(e.target?.result as string)
-    r.readAsDataURL(file)
-  }, [runProcessing])
+    try {
+      const formData = new FormData()
+      formData.append('images', file)
+
+      const res = await fetch(EDGE_FN, {
+        method: 'POST',
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+        body: formData,
+      })
+
+      const data = await res.json()
+
+      // Animate through Studio → Closer with real results at the end
+      setScout('done'); setStudio('working')
+      setTimeout(() => { setStudio('done'); setCloser('working') }, 900)
+      setTimeout(() => {
+        setCloser('done')
+        setRealItem({
+          title: data.title || item.title,
+          tags: data.attributes?.style_tags || item.tags,
+        })
+        setUploadStep('done')
+      }, 1800)
+    } catch {
+      // Fallback: mock animation
+      setTimeout(() => { setScout('done'); setStudio('working') }, 1600)
+      setTimeout(() => { setStudio('done'); setCloser('working') }, 3000)
+      setTimeout(() => { setCloser('done'); setUploadStep('done') }, 4200)
+    }
+  }, [accessToken, item])
 
   const resetUpload = () => {
-    setUploadStep('idle'); setUploadedImg(null)
+    setUploadStep('idle'); setUploadedImg(null); setRealItem(null)
     setScout('idle'); setStudio('idle'); setCloser('idle')
   }
 
@@ -325,63 +370,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ─── SLIDE 4: STATS (near-white) ─── */}
-        <div className={cls(4)} style={{ background: '#F8F6F0' }}>
-          <div className="split">
-            {/* Left — live feed */}
-            <div className="sl sl--stats">
-              <div className="step-lbl">this week on reseller.</div>
-              <h2 className="sl-h2" style={{ marginBottom: '2rem' }}>
-                real sales,<br /><em>real people.</em> 📊
-              </h2>
-              <div className="feed">
-                {LIVE_FEED.map((f, i) => (
-                  <div key={i} className="feed-item" style={{ animationDelay: `${0.1 + i * 0.15}s` }}>
-                    <span className="feed-icon">{f.icon}</span>
-                    <span className="feed-body">
-                      <span className="feed-title">{f.title}</span>
-                      <span className="feed-meta">{f.price} · {f.platform}</span>
-                    </span>
-                    <span className="feed-time">{f.mins}m ago</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {/* Right — animated stat counters */}
-            <div className="sr sr--stats">
-              <div className="stat-grid">
-                <div className="stat-block">
-                  <div className="stat-val">
-                    <AnimatedNum target={STATS.listed}     isActive={slide === 4} />
-                  </div>
-                  <div className="stat-lbl2">items listed this week</div>
-                </div>
-                <div className="stat-block">
-                  <div className="stat-val">
-                    <AnimatedNum target={STATS.revenue} prefix="$" isActive={slide === 4} />
-                  </div>
-                  <div className="stat-lbl2">in total sales</div>
-                </div>
-                <div className="stat-block">
-                  <div className="stat-val">
-                    <AnimatedNum target={STATS.avgHours * 10} isActive={slide === 4} suffix=" hrs" />
-                  </div>
-                  <div className="stat-lbl2">avg time to sell</div>
-                </div>
-                <div className="stat-block">
-                  <div className="stat-val">
-                    <AnimatedNum target={STATS.acceptance} isActive={slide === 4} suffix="%" />
-                  </div>
-                  <div className="stat-lbl2">offer acceptance rate</div>
-                </div>
-              </div>
-              <p className="stats-note">Live data from Supabase · updates every 5 min</p>
-            </div>
-          </div>
-        </div>
-
-        {/* ─── SLIDE 5: UPLOAD (white) ─── */}
-        <div className={cls(5)} style={{ background: '#fff' }}>
+        {/* ─── SLIDE 4: UPLOAD (white) ─── */}
+        <div className={cls(4)} style={{ background: '#fff' }}>
           <div className="split">
             {/* Left */}
             <div className="sl sl--upload">
@@ -422,7 +412,7 @@ export default function Home() {
                 <h2 className="sl-h2">your listing<br />is <em>live.</em> 🎉</h2>
                 <div className="result-card">
                   <div className="rc-badge">✅ ready to push</div>
-                  <div className="rc-title">{item.title}</div>
+                  <div className="rc-title">{realItem?.title ?? item.title}</div>
                   <div className="rc-row">
                     <div>
                       <div className="rc-price">${item.price}</div>
@@ -434,7 +424,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="chip-row" style={{ justifyContent: 'flex-start', marginTop: '0.75rem' }}>
-                    {item.tags.map(t => <span key={t} className="chip">{t}</span>)}
+                    {(realItem?.tags ?? item.tags).map(t => <span key={t} className="chip">{t}</span>)}
                   </div>
                 </div>
                 <div className="rc-ctas">
@@ -484,7 +474,7 @@ export default function Home() {
               {Array.from({ length: SLIDE_COUNT - 1 }, (_, i) => i + 1).map(n => (
                 <button key={n}
                   className={`sdot ${slide === n ? 'sdot--on' : ''}`}
-                  onClick={() => { goTo(n); if (n !== 5) resetUpload() }}
+                  onClick={() => { goTo(n); if (n !== 4) resetUpload() }}
                   aria-label={`Slide ${n}`}
                 />
               ))}
