@@ -2,7 +2,7 @@
   "name": "reseller-root",
   "private": true,
   "scripts": {
-    "build": "cd dashboard && npm install && npx vite build",
+    "build": "cd dashboard && npm install --ignore-scripts && npx vite build",
     "dev": "cd dashboard && npm run dev"
   }
 }
