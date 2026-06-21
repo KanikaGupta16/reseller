@@ -54,6 +54,10 @@ export default function ListingBuilder() {
   const [publishStep, setPublishStep] = useState("");
   const [publishResult, setPublishResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  const [videoUrl, setVideoUrl]         = useState<string | null>(null);
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoIsPika, setVideoIsPika]   = useState(false);
+
   const loadItems = async () => {
     const { data } = await supabase
       .from("items")
@@ -80,6 +84,8 @@ export default function ListingBuilder() {
     });
     setMediaUrls(item.media_urls || []);
     setOriginalImageUrl(item.image_url);
+    setVideoUrl(item.media_video_url || null);
+    setVideoIsPika(!!(item.media_video_url?.includes("pika")));
     setSaveStatus("idle");
     setPublishing(false);
     setPublishStep("");
@@ -163,42 +169,81 @@ export default function ListingBuilder() {
     }
   };
 
+  const generateVideoClip = async () => {
+    if (!selectedId) return;
+    setVideoLoading(true);
+    try {
+      await fetch("http://localhost:3001/api/video/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: selectedId }),
+      });
+      // Poll until done
+      const poll = setInterval(async () => {
+        try {
+          const r = await fetch(`http://localhost:3001/api/video/status/${selectedId}`);
+          const d = await r.json();
+          if (d.status === "done") {
+            clearInterval(poll);
+            setVideoUrl(d.videoUrl);
+            setVideoIsPika(d.isPika);
+            setVideoLoading(false);
+          }
+        } catch { clearInterval(poll); setVideoLoading(false); }
+      }, 4000);
+    } catch { setVideoLoading(false); }
+  };
+
   if (!selectedId) {
     return (
       <div>
-        <h2 style={{ fontSize: 20, marginBottom: 16 }}>Listing Builder</h2>
-        <p style={{ color: "#888", marginBottom: 16 }}>Select an item to build its listing</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+        <h2 style={{ fontWeight: 900, fontSize: "clamp(1.5rem,2.5vw,2rem)", letterSpacing: "-0.04em", textTransform: "lowercase", marginBottom: "0.5rem" }}>listing builder.</h2>
+        <p style={{ color: "var(--muted)", marginBottom: "1.75rem", fontSize: "var(--text-sm)" }}>Select an item to build its listing</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1.25rem" }}>
           {items.map((item) => (
             <div
               key={item.id}
               className="card"
               onClick={() => selectItem(item)}
-              style={{ cursor: "pointer", transition: "border-color 0.15s, box-shadow 0.15s" }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#E875BB"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(0,0,0,0.08)"; }}
+              style={{ cursor: "pointer", transition: "transform 0.15s, box-shadow 0.15s, border-color 0.15s" }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "#E875BB";
+                e.currentTarget.style.transform = "translateY(-3px)";
+                e.currentTarget.style.boxShadow = "0 12px 40px rgba(232,117,187,0.15)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "rgba(0,0,0,0.08)";
+                e.currentTarget.style.transform = "";
+                e.currentTarget.style.boxShadow = "";
+              }}
             >
               {item.image_url && (
-                <img src={item.image_url} alt="" style={{ width: "100%", height: 140, objectFit: "cover", borderRadius: 8, marginBottom: 8 }} />
+                <img src={item.image_url} alt={item.title || ""}
+                  style={{ width: "100%", height: 220, objectFit: "cover", display: "block" }} />
               )}
-              <h4 style={{ margin: "0 0 4px", fontSize: 14 }}>{item.title || "Untitled"}</h4>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {item.category && <span className="tag">{item.category}</span>}
-                {(item.media_urls && item.media_urls.length > 0) && (
-                  <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 100, background: "#f0fdf4", color: "#16a34a", fontWeight: 600 }}>
-                    {item.media_urls.length} photos
-                  </span>
-                )}
-                {item.listing_price && (
-                  <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 100, background: "#FFF0F7", color: "#E875BB", fontWeight: 700 }}>
-                    ${item.listing_price}
-                  </span>
-                )}
+              <div style={{ padding: "1.25rem" }}>
+                <div style={{ fontWeight: 900, fontSize: "1.0625rem", letterSpacing: "-0.02em", marginBottom: "0.625rem", lineHeight: 1.2 }}>
+                  {item.title || "Untitled"}
+                </div>
+                <div style={{ display: "flex", gap: "0.375rem", flexWrap: "wrap", alignItems: "center" }}>
+                  {item.category && <span className="chip">{item.category}</span>}
+                  {item.media_urls && item.media_urls.length > 0 && (
+                    <span className="chip chip-green">{item.media_urls.length} photos</span>
+                  )}
+                  {item.listing_price && (
+                    <span className="chip chip-pink">${item.listing_price}</span>
+                  )}
+                </div>
               </div>
             </div>
           ))}
         </div>
-        {items.length === 0 && <p style={{ color: "#888" }}>No items yet. Upload products first.</p>}
+        {items.length === 0 && (
+          <div className="empty">
+            <span className="empty-icon">🎬</span>
+            <span>No items yet — upload products first.</span>
+          </div>
+        )}
       </div>
     );
   }
@@ -345,6 +390,66 @@ export default function ListingBuilder() {
                 Both photos will be uploaded when publishing
               </p>
             )}
+
+            {/* ── Video section ── */}
+            <div style={{ marginTop: "1.25rem", paddingTop: "1.25rem", borderTop: "1px solid var(--border)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.875rem" }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: "var(--text-sm)", letterSpacing: "-0.01em" }}>
+                    Product Video
+                  </div>
+                  <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginTop: "0.125rem" }}>
+                    {videoIsPika ? "Generated by Pika ✨" : "Powered by Pika (connect to upgrade)"}
+                  </div>
+                </div>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={generateVideoClip}
+                  disabled={videoLoading}
+                  style={{ background: videoUrl ? "var(--gray)" : "var(--black)", color: videoUrl ? "var(--black)" : "var(--white)" }}
+                >
+                  {videoLoading ? "Generating…" : videoUrl ? "Regenerate" : "Generate Video 🎬"}
+                </button>
+              </div>
+
+              {videoLoading && (
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "1rem", background: "var(--ground)", borderRadius: "var(--radius-md)" }}>
+                  <div className="spinner" style={{ width: 20, height: 20 }} />
+                  <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", fontWeight: 600 }}>
+                    {videoIsPika ? "Pika is generating your video…" : "Creating video preview…"}
+                  </span>
+                </div>
+              )}
+
+              {videoUrl && !videoLoading && (
+                <div style={{ borderRadius: "var(--radius-md)", overflow: "hidden", background: "#000", position: "relative" }}>
+                  {videoUrl.endsWith(".mp4") || videoUrl.includes("pika") ? (
+                    <video
+                      src={videoUrl}
+                      autoPlay loop muted playsInline controls
+                      style={{ width: "100%", maxHeight: 200, objectFit: "cover", display: "block" }}
+                    />
+                  ) : (
+                    <img
+                      src={videoUrl}
+                      alt="Video preview"
+                      style={{ width: "100%", maxHeight: 200, objectFit: "cover", display: "block" }}
+                    />
+                  )}
+                  {!videoIsPika && (
+                    <div style={{ position: "absolute", bottom: 8, left: 8, background: "rgba(0,0,0,0.7)", color: "white", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 100, letterSpacing: "0.06em" }}>
+                      PREVIEW — Connect Pika for full video
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!videoUrl && !videoLoading && (
+                <div style={{ textAlign: "center", padding: "1.5rem", background: "var(--ground)", borderRadius: "var(--radius-md)", color: "var(--muted)", fontSize: "var(--text-xs)", fontWeight: 600 }}>
+                  🎬 Click Generate Video to create a product clip
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

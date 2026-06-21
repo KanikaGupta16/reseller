@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-const EDGE_FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-item`
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 const SLIDE_COUNT = 5
 
@@ -68,8 +70,9 @@ export default function LandingPage() {
   const [studio, setStudio]         = useState<AgentState>('idle')
   const [closer, setCloser]         = useState<AgentState>('idle')
   const [item]                      = useState(() => MOCK_ITEMS[Math.floor(Math.random() * MOCK_ITEMS.length)])
-  const [realItem, setRealItem]     = useState<{ title: string; tags: string[] } | null>(null)
-  const [accessToken] = useState<string | null>(null)
+  const [realItem, setRealItem]     = useState<{ title: string; tags: string[]; price?: number } | null>(null)
+  const [videoUrl, setVideoUrl]     = useState<string | null>(null)
+  const [itemId,   setItemId]       = useState<string | null>(null)
 
   useEffect(() => {
     let id: number
@@ -146,45 +149,104 @@ export default function LandingPage() {
 
   const handleFile = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) return
+
+    // Show preview immediately
     const reader = new FileReader()
     reader.onload = e => setUploadedImg(e.target?.result as string)
     reader.readAsDataURL(file)
 
-    setRealItem(null)
+    setRealItem(null); setVideoUrl(null); setItemId(null)
     setScout('idle'); setStudio('idle'); setCloser('idle')
     setUploadStep('processing')
     setScout('working')
 
     try {
-      const formData = new FormData()
-      formData.append('images', file)
+      // 1. Upload image to Supabase storage
+      const ext  = file.name.split('.').pop() || 'jpg'
+      const path = `${crypto.randomUUID()}.${ext}`
+      const uploadRes = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/product-images/${path}`,
+        { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': file.type }, body: file }
+      )
+      if (!uploadRes.ok) throw new Error('Storage upload failed')
+      const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/product-images/${path}`
 
-      const res = await fetch(EDGE_FN, {
+      // 2. Save item to DB
+      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/items`, {
         method: 'POST',
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-        body: formData,
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ image_url: imageUrl, title: 'Analysing...', category: 'other', condition: 'good' }),
       })
+      const [row] = await insertRes.json()
+      const newItemId = row?.id
+      if (!newItemId) throw new Error('DB insert failed')
+      setItemId(newItemId)
 
-      const data = await res.json()
+      // 3. Trigger Scout (research) + Studio (media)
+      await Promise.all([
+        fetch(`${API}/api/research`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: newItemId }) }).catch(() => {}),
+        fetch(`${API}/api/media/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: newItemId }) }).catch(() => {}),
+      ])
+
+      // 4. Poll Scout progress
+      let scoutDone = false
+      for (let i = 0; i < 30 && !scoutDone; i++) {
+        await new Promise(r => setTimeout(r, 3000))
+        try {
+          const r = await fetch(`${API}/api/research/item/${newItemId}`)
+          const d = await r.json()
+          if (d?.status === 'complete' || d?.status === 'done') {
+            scoutDone = true
+            setRealItem({
+              title: d.title || item.title,
+              tags: d.tags || item.tags,
+              price: d.result?.suggested_price,
+            })
+          }
+        } catch {}
+      }
       setScout('done'); setStudio('working')
-      setTimeout(() => { setStudio('done'); setCloser('working') }, 900)
-      setTimeout(() => {
-        setCloser('done')
-        setRealItem({
-          title: data.title || item.title,
-          tags: data.attributes?.style_tags || item.tags,
-        })
-        setUploadStep('done')
-      }, 1800)
+
+      // 5. Poll Studio (media)
+      let studioDone = false
+      for (let i = 0; i < 20 && !studioDone; i++) {
+        await new Promise(r => setTimeout(r, 3000))
+        try {
+          const r = await fetch(`${API}/api/media/status/${newItemId}`)
+          const d = await r.json()
+          if (d?.status === 'done' && d?.count > 0) studioDone = true
+        } catch {}
+      }
+      setStudio('done'); setCloser('working')
+
+      // 6. Trigger Pika video generation
+      fetch(`${API}/api/video/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: newItemId }) }).catch(() => {})
+
+      // 7. Poll video
+      for (let i = 0; i < 36; i++) {
+        await new Promise(r => setTimeout(r, 5000))
+        try {
+          const r = await fetch(`${API}/api/video/status/${newItemId}`)
+          const d = await r.json()
+          if (d?.status === 'done' && d?.videoUrl) {
+            setVideoUrl(d.videoUrl)
+            break
+          }
+        } catch {}
+      }
+      setCloser('done'); setUploadStep('done')
+
     } catch {
-      setTimeout(() => { setScout('done'); setStudio('working') }, 1600)
-      setTimeout(() => { setStudio('done'); setCloser('working') }, 3000)
-      setTimeout(() => { setCloser('done'); setUploadStep('done') }, 4200)
+      // Graceful degraded flow with mock timing
+      setTimeout(() => { setScout('done'); setStudio('working') }, 2000)
+      setTimeout(() => { setStudio('done'); setCloser('working') }, 4000)
+      setTimeout(() => { setCloser('done'); setRealItem({ title: item.title, tags: item.tags }); setUploadStep('done') }, 6000)
     }
-  }, [accessToken, item])
+  }, [item])
 
   const resetUpload = () => {
     setUploadStep('idle'); setUploadedImg(null); setRealItem(null)
+    setVideoUrl(null); setItemId(null)
     setScout('idle'); setStudio('idle'); setCloser('idle')
   }
 
@@ -224,7 +286,7 @@ export default function LandingPage() {
             <h1 className="hero-h1">
               your pile is<br /><em>money</em><br />waiting. 💸
             </h1>
-            <p className="hero-sub">Scout prices it. Studio lists it. Closer sells it. Just upload a photo.</p>
+            <p className="hero-sub">Researcher prices it. Studio lists it. Closer sells it. Just upload a photo.</p>
             <div className="hero-ctas">
               <button className="pill pill-white pill-big" onClick={() => goTo(5)}>Let&apos;s start →</button>
               <button className="pill pill-big pill-ow" onClick={() => goTo(1)}>See how it works</button>
@@ -241,7 +303,7 @@ export default function LandingPage() {
         <div className={cls(1)} style={{ background: 'var(--blue)' }}>
           <div className="split">
             <div className="sl sl--blue">
-              <div className="step-lbl">01 / scout</div>
+              <div className="step-lbl">01 / researcher</div>
               <h2 className="sl-h2">priced before<br />you post. <em>🔍</em></h2>
               <p className="sl-p">Scout scans live Depop, eBay, and FB Marketplace in real time to find the price that sells fast — not the one that sits.</p>
               <div className="price-badge" style={{ marginTop: '1rem' }}>
@@ -327,15 +389,15 @@ export default function LandingPage() {
               </>}
 
               {uploadStep === 'done' && <>
-                <div className="step-lbl">done!</div>
+                <div className="step-lbl">✅ done!</div>
                 <h2 className="sl-h2">your listing<br />is <em>live.</em> 🎉</h2>
                 <div className="result-card">
-                  <div className="rc-badge">ready to push</div>
+                  <div className="rc-badge">✅ listing ready</div>
                   <div className="rc-title">{realItem?.title ?? item.title}</div>
                   <div className="rc-row">
                     <div>
-                      <div className="rc-price">${item.price}</div>
-                      <div className="rc-price-lbl">Scout&apos;s price</div>
+                      <div className="rc-price">${realItem?.price ?? item.price}</div>
+                      <div className="rc-price-lbl">Researcher&apos;s price</div>
                     </div>
                     <div className="rc-demand">
                       <span className="rc-bar" style={{ '--pct': `${item.demand}%` } as React.CSSProperties} />
@@ -345,6 +407,11 @@ export default function LandingPage() {
                   <div className="chip-row" style={{ justifyContent: 'flex-start', marginTop: '0.75rem' }}>
                     {(realItem?.tags ?? item.tags).map(t => <span key={t} className="chip">{t}</span>)}
                   </div>
+                  {itemId && (
+                    <div style={{ marginTop: '0.875rem', fontSize: '0.65rem', color: 'var(--muted)', letterSpacing: '0.06em' }}>
+                      Item ID: {itemId.slice(0, 8)}…
+                    </div>
+                  )}
                 </div>
                 <div className="rc-ctas">
                   <button className="pill pill-big" style={{ background: 'var(--pink-2)' }}>Push live →</button>
@@ -364,15 +431,42 @@ export default function LandingPage() {
               {(uploadStep === 'processing' || uploadStep === 'done') && uploadedImg && (
                 <div className="upload-preview-wrap">
                   <div className="upload-preview-col">
-                    <img src={uploadedImg} alt="Your item" className="upload-img" />
-                    {uploadStep === 'done' && (
-                      <div className="upload-done-badge">listed on depop + fb 🎉</div>
+                    {/* Show Pika video when ready, otherwise show uploaded image */}
+                    {videoUrl ? (
+                      <div style={{ position: 'relative' }}>
+                        {videoUrl.endsWith('.mp4') || videoUrl.includes('pika') ? (
+                          <video src={videoUrl} autoPlay loop muted playsInline
+                            style={{ width: 160, borderRadius: 16, display: 'block', boxShadow: '0 16px 48px rgba(0,0,0,0.18)' }} />
+                        ) : (
+                          <img src={videoUrl} alt="Generated" className="upload-img" />
+                        )}
+                        <div className="upload-done-badge" style={{ background: 'var(--pink-2)' }}>
+                          🎬 {videoUrl.includes('pika') ? 'Pika video ready' : 'preview ready'}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ position: 'relative' }}>
+                        <img src={uploadedImg} alt="Your item" className="upload-img" />
+                        {uploadStep === 'done' && !videoUrl && (
+                          <div className="upload-done-badge">listed on depop + fb 🎉</div>
+                        )}
+                        {uploadStep === 'processing' && closer !== 'idle' && !videoUrl && (
+                          <div className="upload-done-badge" style={{ background: 'var(--black)', animation: 'blink 1s ease-in-out infinite' }}>
+                            🎬 Generating video…
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                   <div className="tips-col">
                     {tips.map((t, i) => (
                       <div key={i} className="tip" style={{ animationDelay: `${i * 0.22}s` }}>{t}</div>
                     ))}
+                    {videoUrl && (
+                      <div className="tip" style={{ animationDelay: '0s', background: '#FFF0F7', color: 'var(--pink-2)', fontWeight: 700 }}>
+                        🎬 {videoUrl.includes('pika') ? 'Pika video generated!' : 'Preview video ready'}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -406,29 +500,123 @@ export default function LandingPage() {
       <div id="below-fold">
         <div className="ticker-wrap" aria-hidden="true">
           <div className="ticker-track">
-            {['upload your item','scout prices it','studio lists it','closer negotiates','depop + fb marketplace','supabase backend'].flatMap((t, i) => [
-              <span key={`a${i}`} className="tick">{t} <span className="tick-dot">●</span></span>,
-              <span key={`b${i}`} className="tick">{t} <span className="tick-dot">●</span></span>,
-            ])}
+            {[
+              { name: 'Browserbase', color: '#6366f1' },
+              { name: 'Pika',        color: '#E875BB' },
+              { name: 'Supabase',    color: '#3ECF8E' },
+              { name: 'OpenAI',      color: '#10a37f' },
+              { name: 'Depop',       color: '#FF2300' },
+              { name: 'FB Marketplace', color: '#1877f2' },
+              { name: 'Stagehand',   color: '#f59e0b' },
+              { name: 'Claude AI',   color: '#D97706' },
+              { name: 'Playwright',  color: '#2EAD33' },
+              { name: 'Browserbase', color: '#6366f1' },
+              { name: 'Pika',        color: '#E875BB' },
+              { name: 'Supabase',    color: '#3ECF8E' },
+              { name: 'OpenAI',      color: '#10a37f' },
+              { name: 'Depop',       color: '#FF2300' },
+              { name: 'FB Marketplace', color: '#1877f2' },
+              { name: 'Stagehand',   color: '#f59e0b' },
+              { name: 'Claude AI',   color: '#D97706' },
+              { name: 'Playwright',  color: '#2EAD33' },
+            ].map((tech, i) => (
+              <span key={i} className="tick">
+                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: tech.color, marginRight: 6, flexShrink: 0 }} />
+                {tech.name}
+              </span>
+            ))}
           </div>
         </div>
 
         <section className="agents-section" id="agents">
           <div className="section-label">how it works</div>
           <h2 className="big-head">snap it.<br /><em>it handles the rest.</em></h2>
-          <div className="agents-grid">
-            {[
-              { icon: '🔍', cls: 'c-blue', num: '01', name: 'scout',  desc: 'Takes your photo, uses AI vision to identify the item, then scrapes Depop, eBay, Facebook, Mercari, Poshmark and more to find what it actually sells for.', tags: ['GPT-4o Vision','Live Scraping','Price Range'] },
-              { icon: '🎬', cls: 'c-pink', num: '02', name: 'studio', desc: 'Writes the title, description and tags. Generates lifestyle photos with AI. Builds a complete listing ready to publish — no copywriting, no photography.', tags: ['AI Copywriting','Image Generation','Listing Builder'] },
-              { icon: '🤝', cls: 'c-yell', num: '03', name: 'closer', desc: 'Posts to Facebook Marketplace automatically. Monitors your Messenger inbox, reads buyer messages, and replies — so deals close while you do other things.', tags: ['FB Marketplace','Auto-Messaging','Negotiation'] },
-            ].map(a => (
-              <div key={a.name} className="agent-card">
-                <div className={`orbit-circle ${a.cls}`}>{a.icon}<div className="ring" /></div>
-                <div><div className="agent-num">Agent {a.num}</div><div className="agent-name">{a.name}</div></div>
-                <p className="agent-p">{a.desc}</p>
-                <div className="chip-row">{a.tags.map(t => <span key={t} className="chip">{t}</span>)}</div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+
+            {/* ── Step 0: Upload ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.625rem', flexShrink: 0 }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%',
+                background: 'var(--gray)', border: '2px dashed rgba(0,0,0,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.625rem'
+              }}>📷</div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)' }}>You</div>
+                <div style={{ fontWeight: 900, fontSize: '0.875rem', letterSpacing: '-0.02em', textTransform: 'lowercase' }}>upload</div>
               </div>
-            ))}
+            </div>
+
+            {/* Arrow 1 */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flexShrink: 0, opacity: 0.4 }}>
+              <svg width="48" height="20" viewBox="0 0 48 20" fill="none">
+                <path d="M2 10 C14 3 34 3 42 10" stroke="#080808" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M37 5 L42 10 L37 15" stroke="#080808" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* ── Agent 01: Researcher ── */}
+            <div className="agent-card" style={{ flexShrink: 0, minWidth: 200 }}>
+              <div className="orbit-circle c-blue" style={{ width: 100, height: 100, fontSize: '2.25rem' }}>🔍<div className="ring" /></div>
+              <div><div className="agent-num">Agent 01</div><div className="agent-name">researcher</div></div>
+              <p className="agent-p" style={{ fontSize: '0.78rem' }}>Uses GPT-4o vision to identify your item, then scrapes Depop, eBay, Facebook, Mercari & more to find the real selling price.</p>
+              <div className="chip-row"><span className="chip">GPT-4o Vision</span><span className="chip">Live Scraping</span><span className="chip">Price Range</span></div>
+            </div>
+
+            {/* Arrow 2 */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flexShrink: 0, opacity: 0.4 }}>
+              <svg width="48" height="20" viewBox="0 0 48 20" fill="none">
+                <path d="M2 10 C14 3 34 3 42 10" stroke="#080808" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M37 5 L42 10 L37 15" stroke="#080808" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* ── Agent 02: Studio ── */}
+            <div className="agent-card" style={{ flexShrink: 0, minWidth: 200 }}>
+              <div className="orbit-circle c-pink" style={{ width: 100, height: 100, fontSize: '2.25rem' }}>🎬<div className="ring" /></div>
+              <div><div className="agent-num">Agent 02</div><div className="agent-name">studio</div></div>
+              <p className="agent-p" style={{ fontSize: '0.78rem' }}>Writes the title, description and tags. Generates AI lifestyle photos. Builds a complete listing — no copywriting, no photography needed.</p>
+              <div className="chip-row"><span className="chip">AI Copywriting</span><span className="chip">Image Gen</span><span className="chip">Listing Builder</span></div>
+            </div>
+
+            {/* Arrow 3 */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flexShrink: 0, opacity: 0.4 }}>
+              <svg width="48" height="20" viewBox="0 0 48 20" fill="none">
+                <path d="M2 10 C14 3 34 3 42 10" stroke="#080808" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M37 5 L42 10 L37 15" stroke="#080808" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* ── Agent 03: Closer ── */}
+            <div className="agent-card" style={{ flexShrink: 0, minWidth: 200 }}>
+              <div className="orbit-circle c-yell" style={{ width: 100, height: 100, fontSize: '2.25rem' }}>🤝<div className="ring" /></div>
+              <div><div className="agent-num">Agent 03</div><div className="agent-name">closer</div></div>
+              <p className="agent-p" style={{ fontSize: '0.78rem' }}>Posts to Facebook Marketplace. Monitors your Messenger inbox, reads offers, and replies — so deals close while you do other things.</p>
+              <div className="chip-row"><span className="chip">FB Marketplace</span><span className="chip">Auto-Messaging</span><span className="chip">Negotiation</span></div>
+            </div>
+
+            {/* Arrow 4 */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flexShrink: 0, opacity: 0.4 }}>
+              <svg width="48" height="20" viewBox="0 0 48 20" fill="none">
+                <path d="M2 10 C14 3 34 3 42 10" stroke="#080808" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M37 5 L42 10 L37 15" stroke="#080808" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* ── Step End: Negotiate & Finalise ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.625rem', flexShrink: 0 }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%',
+                background: 'var(--yellow)', border: '2px solid rgba(0,0,0,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.625rem'
+              }}>💰</div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)' }}>Auto</div>
+                <div style={{ fontWeight: 900, fontSize: '0.875rem', letterSpacing: '-0.02em', textTransform: 'lowercase' }}>negotiate</div>
+                <div style={{ fontWeight: 900, fontSize: '0.875rem', letterSpacing: '-0.02em', textTransform: 'lowercase', lineHeight: 1 }}>&amp; finalise</div>
+              </div>
+            </div>
+
           </div>
         </section>
 
