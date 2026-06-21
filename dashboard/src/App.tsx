@@ -3,8 +3,10 @@ import PhotoUploader from "./components/PhotoUploader";
 import ItemsTable from "./components/ItemsTable";
 import PriceInfo from "./components/PriceInfo";
 import ListingBuilder from "./components/ListingBuilder";
+import ActiveListings from "./components/ActiveListings";
+import MessengerChat from "./components/MessengerChat";
 
-type Tab = "upload" | "price-info" | "listing-builder";
+type Tab = "upload" | "price-info" | "listing-builder" | "active-listings" | "messenger";
 
 export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -24,6 +26,8 @@ export default function App() {
           { key: "upload" as Tab, label: "Upload & Inventory" },
           { key: "price-info" as Tab, label: "Price Info" },
           { key: "listing-builder" as Tab, label: "Listing Builder" },
+          { key: "active-listings" as Tab, label: "Active Listings" },
+          { key: "messenger" as Tab, label: "Messenger" },
         ]).map((t) => (
           <button
             key={t.key}
@@ -58,6 +62,8 @@ export default function App() {
 
       {tab === "price-info" && <PriceInfo />}
       {tab === "listing-builder" && <ListingBuilder />}
+      {tab === "active-listings" && <ActiveListings />}
+      {tab === "messenger" && <MessengerChat />}
     </div>
   );
 }

@@ -34,7 +34,7 @@ const CATEGORIES = [
   "Collectibles", "Jewelry", "Musical Instruments", "Other",
 ];
 
-const CONDITIONS = ["New", "Like New", "Good", "Fair", "Poor"];
+const CONDITIONS = ["New", "Like New", "Good", "Fair"];
 
 export default function ListingBuilder() {
   const [items, setItems] = useState<Item[]>([]);
@@ -45,12 +45,13 @@ export default function ListingBuilder() {
     meetup_preferences: { door_pickup: false, door_dropoff: false, public_meetup: false },
   });
   const [mediaUrls, setMediaUrls] = useState<string[]>([]);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
-  const [mediaGenerating, setMediaGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
   const [showJson, setShowJson] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [publishStep, setPublishStep] = useState("");
+  const [publishResult, setPublishResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const loadItems = async () => {
     const { data } = await supabase
@@ -64,23 +65,6 @@ export default function ListingBuilder() {
     loadItems();
   }, []);
 
-  // Poll for media generation status
-  useEffect(() => {
-    if (!selectedId || !mediaGenerating) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`http://localhost:3001/api/media/status/${selectedId}`);
-        const data = await res.json();
-        if (data.status === "done" && data.count > 0) {
-          setMediaUrls(data.media_urls);
-          setVideoUrl(data.video_url);
-          setMediaGenerating(false);
-        }
-      } catch {}
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [selectedId, mediaGenerating]);
-
   const selectItem = (item: Item) => {
     setSelectedId(item.id);
     setForm({
@@ -90,14 +74,15 @@ export default function ListingBuilder() {
       condition: item.condition || "",
       location: item.location || "San Francisco, CA",
       description: item.description || "",
-      meetup_preferences: item.meetup_preferences || { door_pickup: false, door_dropoff: false, public_meetup: false },
+      meetup_preferences: item.meetup_preferences || { door_pickup: true, door_dropoff: false, public_meetup: false },
     });
     setMediaUrls(item.media_urls || []);
-    setVideoUrl(item.media_video_url || null);
     setOriginalImageUrl(item.image_url);
-    setMediaGenerating(false);
     setShowJson(false);
     setSaveStatus("idle");
+    setPublishing(false);
+    setPublishStep("");
+    setPublishResult(null);
   };
 
   const updateField = (key: string, value: unknown) => {
@@ -111,22 +96,6 @@ export default function ListingBuilder() {
       meetup_preferences: { ...f.meetup_preferences, [key]: !f.meetup_preferences[key] },
     }));
     setSaveStatus("idle");
-  };
-
-  const triggerMediaGeneration = async () => {
-    if (!selectedId) return;
-    setMediaGenerating(true);
-    setMediaUrls([]);
-    try {
-      await fetch("http://localhost:3001/api/media/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: selectedId }),
-      });
-    } catch (err) {
-      console.error("Failed to trigger media generation:", err);
-      setMediaGenerating(false);
-    }
   };
 
   const saveListing = async () => {
@@ -160,6 +129,40 @@ export default function ListingBuilder() {
     setSaving(false);
   };
 
+  const publishToFacebook = async () => {
+    if (!selectedId) return;
+    // Save first, then publish
+    await saveListing();
+    setPublishing(true);
+    setPublishStep("starting");
+    setPublishResult(null);
+
+    try {
+      await fetch("http://localhost:3001/api/publish/facebook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId: selectedId }),
+      });
+
+      // Poll for status
+      const poll = setInterval(async () => {
+        try {
+          const res = await fetch(`http://localhost:3001/api/publish/facebook/${selectedId}`);
+          const data = await res.json();
+          setPublishStep(data.step || "");
+          if (data.status === "done" || data.status === "failed") {
+            clearInterval(poll);
+            setPublishing(false);
+            setPublishResult(data.result);
+          }
+        } catch {}
+      }, 3000);
+    } catch {
+      setPublishing(false);
+      setPublishResult({ success: false, message: "Failed to start publish" });
+    }
+  };
+
   const finalOutput = {
     title: form.title,
     price: Number(form.price),
@@ -171,7 +174,6 @@ export default function ListingBuilder() {
     media: {
       original: originalImageUrl,
       generated_images: mediaUrls,
-      video: videoUrl,
     },
   };
 
@@ -266,14 +268,49 @@ export default function ListingBuilder() {
               ))}
             </div>
 
-            <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
+            <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button onClick={saveListing} disabled={saving} className="btn btn-primary">
                 {saving ? "Saving..." : "Save Listing"}
               </button>
               <button onClick={() => setShowJson(!showJson)} className="btn" style={{ background: "#222", color: "#aaa" }}>
                 {showJson ? "Hide" : "View"} JSON
               </button>
+              <button
+                onClick={publishToFacebook}
+                disabled={publishing || saving}
+                className="btn"
+                style={{ background: "#1877f2", color: "#fff" }}
+              >
+                {publishing ? "Publishing..." : "Publish to Facebook"}
+              </button>
             </div>
+
+            {publishing && (
+              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, padding: 10, background: "#0d0d14", borderRadius: 6 }}>
+                <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
+                <span style={{ color: "#aaa", fontSize: 13 }}>
+                  {publishStep === "downloading_photos" && "Downloading photos..."}
+                  {publishStep === "starting_browser" && "Starting browser session..."}
+                  {publishStep === "navigating" && "Opening Facebook Marketplace..."}
+                  {publishStep === "uploading_photos" && "Uploading photos to listing..."}
+                  {publishStep === "filling_form" && "Filling listing form..."}
+                  {publishStep === "publishing" && "Publishing listing..."}
+                  {publishStep === "verifying" && "Verifying listing is live..."}
+                  {!["downloading_photos", "starting_browser", "navigating", "uploading_photos", "filling_form", "publishing", "verifying"].includes(publishStep) && `${publishStep || "Starting"}...`}
+                </span>
+              </div>
+            )}
+
+            {publishResult && (
+              <div style={{
+                marginTop: 12, padding: 12, borderRadius: 6,
+                background: publishResult.success ? "#0d1f14" : "#1f0d0d",
+                color: publishResult.success ? "#4ecdc4" : "#ff6b6b",
+                fontSize: 13,
+              }}>
+                {publishResult.success ? "Listed on Facebook Marketplace" : "Publish failed"}: {publishResult.message}
+              </div>
+            )}
           </div>
 
           {showJson && (
@@ -289,57 +326,33 @@ export default function ListingBuilder() {
         {/* Right column: Media */}
         <div>
           <div className="card" style={{ marginBottom: 16 }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>Product Media</h3>
+            <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>Product Photos</h3>
 
-            {/* Original photo */}
-            {originalImageUrl && (
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ ...labelStyle, marginBottom: 8 }}>Original Photo</label>
-                <img src={originalImageUrl} alt="Original" style={{ width: "100%", maxHeight: 250, objectFit: "contain", borderRadius: 8, background: "#0d0d14" }} />
-              </div>
-            )}
+            <div style={{ display: "grid", gridTemplateColumns: originalImageUrl && mediaUrls.length > 0 ? "1fr 1fr" : "1fr", gap: 12 }}>
+              {originalImageUrl && (
+                <div>
+                  <label style={{ ...labelStyle, marginBottom: 8 }}>Original</label>
+                  <img src={originalImageUrl} alt="Original" style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 8, background: "#0d0d14" }} />
+                </div>
+              )}
 
-            {/* Generated images */}
-            <label style={{ ...labelStyle, marginBottom: 8 }}>
-              AI-Generated Lifestyle Photo {mediaUrls.length > 0 ? "" : "(0)"}
-            </label>
+              {mediaUrls.length > 0 && (
+                <div>
+                  <label style={{ ...labelStyle, marginBottom: 8 }}>AI Lifestyle</label>
+                  <img src={mediaUrls[0]} alt="Lifestyle" style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 8, background: "#0d0d14" }} />
+                </div>
+              )}
+            </div>
 
-            {mediaGenerating && (
-              <div style={{ textAlign: "center", padding: 24, background: "#0d0d14", borderRadius: 8, marginBottom: 12 }}>
-                <div className="spinner" />
-                <p style={{ color: "#aaa", fontSize: 13, marginTop: 12 }}>
-                  Generating lifestyle photo...
-                </p>
-                <p style={{ color: "#555", fontSize: 11, marginTop: 4 }}>
-                  ~15-30 seconds
-                </p>
-              </div>
-            )}
-
-            {mediaUrls.length > 0 && (
-              <div style={{ marginBottom: 12 }}>
-                {mediaUrls.map((url, i) => (
-                  <img key={i} src={url} alt="Lifestyle" style={{ width: "100%", borderRadius: 8, marginBottom: 8 }} />
-                ))}
-              </div>
-            )}
-
-            {!mediaGenerating && mediaUrls.length === 0 && (
-              <p style={{ color: "#555", fontSize: 13, marginBottom: 12 }}>
-                No generated photos yet — they auto-generate on upload, or click below.
+            {mediaUrls.length === 0 && (
+              <p style={{ color: "#555", fontSize: 12, marginTop: 12, textAlign: "center" }}>
+                Lifestyle photo auto-generates when item is uploaded
               </p>
             )}
 
-            {/* Generate / Regenerate button */}
-            {!mediaGenerating && (
-              <button onClick={triggerMediaGeneration} className="btn btn-primary" style={{ width: "100%" }}>
-                {mediaUrls.length > 0 ? "Regenerate Photo" : "Generate Lifestyle Photo"}
-              </button>
-            )}
-
-            {mediaUrls.length > 0 && (
-              <p style={{ color: "#4ecdc4", fontSize: 11, marginTop: 8, textAlign: "center" }}>
-                Images saved to Supabase Storage — available across sessions
+            {(originalImageUrl || mediaUrls.length > 0) && (
+              <p style={{ color: "#666", fontSize: 11, marginTop: 10, textAlign: "center" }}>
+                Both photos will be uploaded when publishing
               </p>
             )}
           </div>

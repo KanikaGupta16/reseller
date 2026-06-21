@@ -2,6 +2,8 @@ import Browserbase from "@browserbasehq/sdk";
 import { chromium } from "playwright-core";
 import * as cheerio from "cheerio";
 import OpenAI from "openai";
+import { Stagehand } from "@browserbasehq/stagehand";
+import { z } from "zod/v3";
 import { SupabaseClient } from "@supabase/supabase-js";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -230,6 +232,103 @@ async function extractViaPage(page: any, site: string): Promise<ScrapedListing[]
   return [];
 }
 
+const FbListingSchema = z.object({
+  listings: z.array(
+    z.object({
+      title: z.string(),
+      price: z.number(),
+      condition: z.string(),
+      location: z.string().optional(),
+    })
+  ),
+});
+
+async function scrapeFacebookMarketplace(item: DbItem): Promise<ScrapedListing[]> {
+  const contextId = process.env.BROWSERBASE_CONTEXT_ID;
+  if (!contextId) {
+    console.log("  [Facebook] No BROWSERBASE_CONTEXT_ID, skipping");
+    return [];
+  }
+
+  console.log("  [Facebook] Scraping Facebook Marketplace...");
+
+  const stagehand = new Stagehand({
+    env: "BROWSERBASE",
+    verbose: 0,
+    browserbaseSessionCreateParams: {
+      browserSettings: {
+        solveCaptchas: true,
+        context: { id: contextId, persist: true },
+      },
+    },
+  });
+
+  try {
+    await stagehand.init();
+    const page = stagehand.context.pages()[0];
+
+    try {
+      await page.goto("https://www.facebook.com/", { waitUntil: "domcontentloaded", timeout: 30000 });
+    } catch {}
+    await page.waitForTimeout(4000);
+
+    const loginCheck = await stagehand.extract(
+      "Is this a Facebook LOGIN page with email/password fields? Answer true ONLY if you see a login form.",
+      z.object({ isLoginPage: z.boolean() }),
+    );
+    if (loginCheck.isLoginPage) {
+      console.log("  [Facebook] Session expired, skipping");
+      return [];
+    }
+
+    const searchTerm = [item.brand, item.model, item.title].filter(Boolean).join(" ");
+    const marketplaceUrl = `https://www.facebook.com/marketplace/search/?query=${encodeURIComponent(searchTerm)}`;
+
+    console.log(`  [Facebook] Searching: ${searchTerm}`);
+    try {
+      await page.goto(marketplaceUrl, { waitUntil: "domcontentloaded", timeout: 45000 });
+    } catch {}
+    await page.waitForTimeout(5000);
+
+    for (let i = 0; i < 3; i++) {
+      await page.evaluate(() => window.scrollBy(0, window.innerHeight));
+      await page.waitForTimeout(2000);
+    }
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(1000);
+
+    const extracted = await stagehand.extract(
+      `Extract all visible product listings from this Facebook Marketplace search results page.
+For each listing, get:
+- title: the product name/title
+- price: the numeric price in dollars (0 if free or not shown)
+- condition: "new", "like new", "good", "fair", or "unknown"
+- location: the seller's location if shown
+
+Only include real product listings, not ads or suggested items.`,
+      FbListingSchema,
+    );
+
+    const listings: ScrapedListing[] = extracted.listings
+      .filter((l) => l.price > 0)
+      .map((l) => ({
+        source: "Facebook Marketplace",
+        title: l.title,
+        price: l.price,
+        condition: l.condition || "unknown",
+        url: marketplaceUrl,
+      }));
+
+    console.log(`  [Facebook] Found ${listings.length} listings`);
+    return listings.slice(0, 15);
+  } catch (err: any) {
+    console.error(`  [Facebook] Error: ${err.message}`);
+    return [];
+  } finally {
+    await stagehand.close();
+  }
+}
+
 function filterListings(listings: ScrapedListing[], item: DbItem): ScrapedListing[] {
   const searchTitle = [item.brand, item.model, item.title].filter(Boolean).join(" ");
   const words = searchTitle.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
@@ -297,23 +396,35 @@ export async function runResearch(
 ) {
   console.log(`\n[Research] Starting for "${item.title}" (job: ${jobId})`);
 
-  // Step 1: Scrape all sources in parallel
+  // Step 1: Scrape all sources in parallel (including Facebook Marketplace)
   const queries = buildSearchQueries(item);
   const sourcesStatus: Record<string, string> = {};
   queries.forEach((q) => (sourcesStatus[q.site] = "scraping"));
+  sourcesStatus["Facebook Marketplace"] = "scraping";
   await updateJob(supabase, jobId, { step: "scraping", progress: 10, sources_status: sourcesStatus });
 
-  const results = await Promise.allSettled(
-    queries.map(async (q) => {
-      const listings = await scrapeWithBrowserbase(q.site, q.url);
-      sourcesStatus[q.site] = listings.length > 0 ? `found ${listings.length}` : "no results";
-      await updateJob(supabase, jobId, { sources_status: sourcesStatus });
+  const [browserbaseResults, fbResult] = await Promise.all([
+    Promise.allSettled(
+      queries.map(async (q) => {
+        const listings = await scrapeWithBrowserbase(q.site, q.url);
+        sourcesStatus[q.site] = listings.length > 0 ? `found ${listings.length}` : "no results";
+        await updateJob(supabase, jobId, { sources_status: sourcesStatus });
+        return listings;
+      })
+    ),
+    scrapeFacebookMarketplace(item).then((listings) => {
+      sourcesStatus["Facebook Marketplace"] = listings.length > 0 ? `found ${listings.length}` : "no results";
+      updateJob(supabase, jobId, { sources_status: sourcesStatus });
       return listings;
-    })
-  );
+    }).catch(() => {
+      sourcesStatus["Facebook Marketplace"] = "error";
+      updateJob(supabase, jobId, { sources_status: sourcesStatus });
+      return [] as ScrapedListing[];
+    }),
+  ]);
 
-  const allListings: ScrapedListing[] = [];
-  for (const r of results) {
+  const allListings: ScrapedListing[] = [...fbResult];
+  for (const r of browserbaseResults) {
     if (r.status === "fulfilled") allListings.push(...r.value);
   }
 
