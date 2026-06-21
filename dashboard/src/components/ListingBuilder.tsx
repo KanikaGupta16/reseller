@@ -250,233 +250,204 @@ export default function ListingBuilder() {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-        <button onClick={() => { setSelectedId(null); loadItems(); }} className="btn btn-secondary">
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", marginBottom: "1.75rem" }}>
+        <button onClick={() => { setSelectedId(null); loadItems(); }} className="btn btn-ghost btn-sm">
           ← Back
         </button>
-        <h2 style={{ fontSize: 20, margin: 0 }}>Build Listing</h2>
-        {saveStatus === "saved" && <span style={{ color: "#16a34a", fontSize: 14, fontWeight: 700 }}>Saved</span>}
-        {saveStatus === "error" && <span style={{ color: "#ef4444", fontSize: 14, fontWeight: 700 }}>Save failed</span>}
+        <div>
+          <h2 style={{ fontWeight: 900, fontSize: "1.5rem", letterSpacing: "-0.03em", textTransform: "lowercase", margin: 0 }}>listing builder.</h2>
+        </div>
+        {saveStatus === "saved" && <span className="chip chip-green" style={{ marginLeft: "auto" }}>Saved ✓</span>}
+        {saveStatus === "error" && <span style={{ color: "#ef4444", fontSize: "var(--text-sm)", fontWeight: 700, marginLeft: "auto" }}>Save failed</span>}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-        <div>
-          <div className="card" style={{ marginBottom: 16 }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>Listing Details</h3>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", alignItems: "start" }}>
 
-            <label style={labelStyle}>Title</label>
-            <input style={inputStyle} value={form.title} onChange={(e) => updateField("title", e.target.value)} />
-
-            <label style={labelStyle}>Price ($)</label>
-            <input style={inputStyle} type="number" step="0.01" value={form.price} onChange={(e) => updateField("price", parseFloat(e.target.value) || 0)} />
-
-            <label style={labelStyle}>Min Negotiation Price ($)</label>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                style={{ ...inputStyle, marginBottom: 0 }}
-                type="number"
-                step="0.01"
-                value={form.min_negotiation_price ?? Math.round(form.price * 0.8)}
-                onChange={(e) => updateField("min_negotiation_price", parseFloat(e.target.value) || 0)}
-              />
-              {form.min_negotiation_price !== null && (
-                <button onClick={() => updateField("min_negotiation_price", null)} className="btn btn-secondary" style={{ fontSize: 11, padding: "6px 10px", whiteSpace: "nowrap" }}>
-                  Reset
-                </button>
-              )}
-            </div>
-            <span style={{ fontSize: 11, color: "#888", marginTop: 2, display: "block" }}>
-              {form.min_negotiation_price === null ? "Auto: 80% of listing price" : "Custom override"}
-            </span>
-
-            <label style={labelStyle}>Category</label>
-            <select style={inputStyle} value={form.category} onChange={(e) => updateField("category", e.target.value)}>
-              <option value="">Select...</option>
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-
-            <label style={labelStyle}>Condition</label>
-            <select style={inputStyle} value={form.condition} onChange={(e) => updateField("condition", e.target.value)}>
-              <option value="">Select...</option>
-              {CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-
-            <label style={labelStyle}>Location</label>
-            <input style={inputStyle} value={form.location} onChange={(e) => updateField("location", e.target.value)} placeholder="e.g. San Francisco, CA" />
-
-            <label style={labelStyle}>Description</label>
-            <textarea style={{ ...inputStyle, minHeight: 100, resize: "vertical" }} value={form.description} onChange={(e) => updateField("description", e.target.value)} />
-
-            <label style={labelStyle}>Meetup Preferences</label>
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {(["door_pickup", "door_dropoff", "public_meetup"] as const).map((key) => (
-                <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: "#333", fontSize: 13 }}>
-                  <input type="checkbox" checked={form.meetup_preferences[key]} onChange={() => toggleMeetup(key)} />
-                  {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-                </label>
-              ))}
+        {/* ── LEFT: Form ── */}
+        <div className="card">
+          <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "1.125rem" }}>
+            <div style={{ fontWeight: 800, fontSize: "0.9375rem", letterSpacing: "-0.01em", paddingBottom: "0.875rem", borderBottom: "1.5px solid var(--border)" }}>
+              Listing Details
             </div>
 
-            <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div className="field">
+              <label>Title</label>
+              <input className="input" value={form.title} onChange={(e) => updateField("title", e.target.value)} />
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.875rem" }}>
+              <div className="field">
+                <label>Price ($)</label>
+                <input className="input" type="number" step="0.01" value={form.price} onChange={(e) => updateField("price", parseFloat(e.target.value) || 0)} />
+              </div>
+              <div className="field">
+                <label>Min Price ($)</label>
+                <div style={{ display: "flex", gap: "0.375rem" }}>
+                  <input
+                    className="input"
+                    type="number" step="0.01"
+                    value={form.min_negotiation_price ?? Math.round(form.price * 0.8)}
+                    onChange={(e) => updateField("min_negotiation_price", parseFloat(e.target.value) || 0)}
+                    style={{ flex: 1 }}
+                  />
+                  {form.min_negotiation_price !== null && (
+                    <button onClick={() => updateField("min_negotiation_price", null)} className="btn btn-ghost btn-sm">Auto</button>
+                  )}
+                </div>
+                <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>
+                  {form.min_negotiation_price === null ? "Auto: 80% of listing price" : "Custom"}
+                </span>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.875rem" }}>
+              <div className="field">
+                <label>Category</label>
+                <select className="input" value={form.category} onChange={(e) => updateField("category", e.target.value)}>
+                  <option value="">Select...</option>
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="field">
+                <label>Condition</label>
+                <select className="input" value={form.condition} onChange={(e) => updateField("condition", e.target.value)}>
+                  <option value="">Select...</option>
+                  {CONDITIONS.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="field">
+              <label>Location</label>
+              <input className="input" value={form.location} onChange={(e) => updateField("location", e.target.value)} placeholder="e.g. San Francisco, CA" />
+            </div>
+
+            <div className="field">
+              <label>Description</label>
+              <textarea className="input textarea" value={form.description} onChange={(e) => updateField("description", e.target.value)} style={{ minHeight: 100 }} />
+            </div>
+
+            <div className="field">
+              <label>Meetup Preferences</label>
+              <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
+                {(["door_pickup", "door_dropoff", "public_meetup"] as const).map((key) => (
+                  <label key={key} style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer", fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                    <input type="checkbox" checked={form.meetup_preferences[key]} onChange={() => toggleMeetup(key)} />
+                    {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", paddingTop: "0.5rem", borderTop: "1.5px solid var(--border)" }}>
               <button onClick={saveListing} disabled={saving} className="btn btn-primary">
-                {saving ? "Saving..." : "Save Listing"}
+                {saving ? "Saving…" : "Save Listing"}
               </button>
-              <button
-                onClick={publishToFacebook}
-                disabled={publishing || saving}
-                className="btn btn-fb"
-              >
-                {publishing ? "Publishing..." : "Publish to Facebook Marketplace"}
+              <button onClick={publishToFacebook} disabled={publishing || saving} className="btn btn-fb">
+                {publishing ? "Publishing…" : "Publish to Facebook"}
               </button>
             </div>
 
             {publishing && (
-              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, padding: 10, background: "#F8F8F8", borderRadius: 8, border: "1px solid rgba(0,0,0,0.08)" }}>
-                <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
-                <span style={{ color: "#555", fontSize: 13 }}>
-                  {publishStep === "downloading_photos" && "Downloading photos..."}
-                  {publishStep === "starting_browser" && "Starting browser session..."}
-                  {publishStep === "navigating" && "Opening Facebook Marketplace..."}
-                  {publishStep === "uploading_photos" && "Uploading photos to listing..."}
-                  {publishStep === "filling_form" && "Filling listing form..."}
-                  {publishStep === "publishing" && "Publishing listing..."}
-                  {publishStep === "verifying" && "Verifying listing is live..."}
-                  {!["downloading_photos", "starting_browser", "navigating", "uploading_photos", "filling_form", "publishing", "verifying"].includes(publishStep) && `${publishStep || "Starting"}...`}
+              <div className="agent-row agent-row--working">
+                <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
+                <span style={{ color: "var(--muted)", fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                  {publishStep || "Starting"}…
                 </span>
               </div>
             )}
-
             {publishResult && (
-              <div style={{
-                marginTop: 12, padding: 12, borderRadius: 8,
-                background: publishResult.success ? "#f0fdf4" : "#fef2f2",
-                color: publishResult.success ? "#16a34a" : "#ef4444",
-                fontSize: 13, fontWeight: 600,
-              }}>
+              <div className={publishResult.success ? "result-ok" : "result-err"}>
                 {publishResult.success ? "Listed on Facebook Marketplace" : "Publish failed"}: {publishResult.message}
               </div>
             )}
           </div>
         </div>
 
-        <div>
-          <div className="card" style={{ marginBottom: 16 }}>
-            <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>Product Photos</h3>
+        {/* ── RIGHT: Photos + Video ── */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
 
-            <div style={{ display: "grid", gridTemplateColumns: originalImageUrl && mediaUrls.length > 0 ? "1fr 1fr" : "1fr", gap: 12 }}>
+          {/* Photos card */}
+          <div className="card">
+            <div style={{ fontWeight: 800, fontSize: "0.9375rem", letterSpacing: "-0.01em", padding: "1.25rem 1.5rem", borderBottom: "1.5px solid var(--border)" }}>
+              Product Photos
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: originalImageUrl && mediaUrls.length > 0 ? "1fr 1fr" : "1fr" }}>
               {originalImageUrl && (
                 <div>
-                  <label style={{ ...labelStyle, marginBottom: 8 }}>Original</label>
-                  <img src={originalImageUrl} alt="Original" style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 8, background: "#F8F8F8" }} />
+                  <div style={{ padding: "0.75rem 1.25rem 0.5rem", fontSize: "var(--text-xs)", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted)" }}>Original</div>
+                  <img src={originalImageUrl} alt="Original" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
                 </div>
               )}
-
               {mediaUrls.length > 0 && (
-                <div>
-                  <label style={{ ...labelStyle, marginBottom: 8 }}>AI Lifestyle</label>
-                  <img src={mediaUrls[0]} alt="Lifestyle" style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 8, background: "#F8F8F8" }} />
+                <div style={{ borderLeft: originalImageUrl ? "1.5px solid var(--border)" : "none" }}>
+                  <div style={{ padding: "0.75rem 1.25rem 0.5rem", fontSize: "var(--text-xs)", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted)" }}>AI Lifestyle</div>
+                  <img src={mediaUrls[0]} alt="Lifestyle" style={{ width: "100%", aspectRatio: "1", objectFit: "cover", display: "block" }} />
                 </div>
               )}
             </div>
-
-            {mediaUrls.length === 0 && (
-              <p style={{ color: "#888", fontSize: 12, marginTop: 12, textAlign: "center" }}>
-                Lifestyle photo auto-generates when item is uploaded
-              </p>
-            )}
-
-            {(originalImageUrl || mediaUrls.length > 0) && (
-              <p style={{ color: "#888", fontSize: 11, marginTop: 10, textAlign: "center" }}>
-                Both photos will be uploaded when publishing
-              </p>
-            )}
-
-            {/* ── Video section ── */}
-            <div style={{ marginTop: "1.25rem", paddingTop: "1.25rem", borderTop: "1px solid var(--border)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.875rem" }}>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: "var(--text-sm)", letterSpacing: "-0.01em" }}>
-                    Product Video
-                  </div>
-                  <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginTop: "0.125rem" }}>
-                    {videoIsPika ? "Generated by Pika ✨" : "Powered by Pika (connect to upgrade)"}
-                  </div>
-                </div>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={generateVideoClip}
-                  disabled={videoLoading}
-                  style={{ background: videoUrl ? "var(--gray)" : "var(--black)", color: videoUrl ? "var(--black)" : "var(--white)" }}
-                >
-                  {videoLoading ? "Generating…" : videoUrl ? "Regenerate" : "Generate Video 🎬"}
-                </button>
+            {!originalImageUrl && mediaUrls.length === 0 && (
+              <div className="empty" style={{ padding: "2rem" }}>
+                <span className="empty-icon" style={{ fontSize: "2rem" }}>🖼️</span>
+                <span>Lifestyle photo auto-generates when item is uploaded</span>
               </div>
+            )}
+            {(originalImageUrl || mediaUrls.length > 0) && (
+              <div style={{ padding: "0.75rem 1.25rem", borderTop: "1.5px solid var(--border)", fontSize: "var(--text-xs)", color: "var(--muted)", textAlign: "center", fontWeight: 600 }}>
+                Both photos will be uploaded when publishing
+              </div>
+            )}
 
-              {videoLoading && (
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", padding: "1rem", background: "var(--ground)", borderRadius: "var(--radius-md)" }}>
-                  <div className="spinner" style={{ width: 20, height: 20 }} />
-                  <span style={{ fontSize: "var(--text-xs)", color: "var(--muted)", fontWeight: 600 }}>
-                    {videoIsPika ? "Pika is generating your video…" : "Creating video preview…"}
-                  </span>
-                </div>
-              )}
+          </div>{/* /photos card */}
 
-              {videoUrl && !videoLoading && (
-                <div style={{ borderRadius: "var(--radius-md)", overflow: "hidden", background: "#000", position: "relative" }}>
-                  {videoUrl.endsWith(".mp4") || videoUrl.includes("pika") ? (
-                    <video
-                      src={videoUrl}
-                      autoPlay loop muted playsInline controls
-                      style={{ width: "100%", maxHeight: 200, objectFit: "cover", display: "block" }}
-                    />
-                  ) : (
-                    <img
-                      src={videoUrl}
-                      alt="Video preview"
-                      style={{ width: "100%", maxHeight: 200, objectFit: "cover", display: "block" }}
-                    />
-                  )}
-                  {!videoIsPika && (
-                    <div style={{ position: "absolute", bottom: 8, left: 8, background: "rgba(0,0,0,0.7)", color: "white", fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 100, letterSpacing: "0.06em" }}>
-                      PREVIEW — Connect Pika for full video
-                    </div>
-                  )}
+          {/* Video card */}
+          <div className="card">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.125rem 1.5rem", borderBottom: "1.5px solid var(--border)" }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: "0.9375rem", letterSpacing: "-0.01em" }}>Product Video</div>
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginTop: "0.125rem" }}>
+                  {videoIsPika ? "Generated by Pika ✨" : "Powered by Pika"}
                 </div>
-              )}
-
-              {!videoUrl && !videoLoading && (
-                <div style={{ textAlign: "center", padding: "1.5rem", background: "var(--ground)", borderRadius: "var(--radius-md)", color: "var(--muted)", fontSize: "var(--text-xs)", fontWeight: 600 }}>
-                  🎬 Click Generate Video to create a product clip
-                </div>
-              )}
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={generateVideoClip} disabled={videoLoading}>
+                {videoLoading ? "Generating…" : videoUrl ? "Regenerate 🎬" : "Generate Video 🎬"}
+              </button>
             </div>
+
+            {videoLoading && (
+              <div className="agent-row" style={{ margin: "1rem 1.25rem", borderRadius: "var(--radius-sm)" }}>
+                <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
+                <span style={{ fontSize: "var(--text-sm)", color: "var(--muted)", fontWeight: 600 }}>
+                  {videoIsPika ? "Pika is generating your video…" : "Creating video preview…"}
+                </span>
+              </div>
+            )}
+
+            {videoUrl && !videoLoading ? (
+              <div style={{ position: "relative", overflow: "hidden", borderRadius: "0 0 var(--radius-md) var(--radius-md)" }}>
+                {videoUrl.endsWith(".mp4") || videoUrl.includes("pika") ? (
+                  <video src={videoUrl} autoPlay loop muted playsInline controls style={{ width: "100%", display: "block", maxHeight: 280, objectFit: "cover" }} />
+                ) : (
+                  <img src={videoUrl} alt="Video preview" style={{ width: "100%", display: "block", maxHeight: 280, objectFit: "cover" }} />
+                )}
+                {!videoIsPika && (
+                  <div style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(0,0,0,0.72)", color: "white", fontSize: "var(--text-xs)", fontWeight: 700, padding: "4px 10px", borderRadius: 100, letterSpacing: "0.06em" }}>
+                    PREVIEW — Connect Pika for full video
+                  </div>
+                )}
+              </div>
+            ) : !videoLoading && (
+              <div className="empty" style={{ padding: "2rem" }}>
+                <span style={{ fontSize: "2rem" }}>🎬</span>
+                <span style={{ fontWeight: 600 }}>Click Generate Video to create a product clip</span>
+              </div>
+            )}
           </div>
-        </div>
+
+        </div>{/* /right column */}
       </div>
     </div>
   );
 }
 
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: 11,
-  color: "#888",
-  marginBottom: 4,
-  marginTop: 12,
-  textTransform: "uppercase",
-  letterSpacing: 0.8,
-  fontWeight: 800,
-};
-
-const inputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "8px 12px",
-  background: "#FFFFFF",
-  border: "1.5px solid rgba(0,0,0,0.08)",
-  borderRadius: 8,
-  color: "#080808",
-  fontSize: 14,
-  marginBottom: 4,
-  outline: "none",
-  fontFamily: "inherit",
-};
