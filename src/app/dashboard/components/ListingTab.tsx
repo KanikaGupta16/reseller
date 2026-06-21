@@ -18,7 +18,7 @@ export default function ListingTab() {
   const [publishStep, setPublishStep] = useState('')
   const [publishResult, setPublishResult] = useState<{ success: boolean; message: string } | null>(null)
   const [showJson, setShowJson] = useState(false)
-  const pollRef = useRef<NodeJS.Timeout>()
+  const pollRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
   useEffect(() => {
     supabase.from('items').select('*').order('created_at', { ascending: false }).then(({ data }) => setItems(data || []))
