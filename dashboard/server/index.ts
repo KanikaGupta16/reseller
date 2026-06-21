@@ -3,6 +3,7 @@ import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
 import { runResearch } from "./research";
 import { generateMedia, buildFinalListing } from "./media";
+import { generateVideo } from "./video";
 import { publishToFacebook } from "./facebook";
 import { messengerSession } from "./messenger";
 import { buyerAgent } from "./buyer-agent";
@@ -119,6 +120,31 @@ app.get("/api/media/status/:itemId", async (req, res) => {
     count: urls.length,
     media_urls: urls,
     video_url: data.media_video_url,
+  });
+});
+
+// --- Video generation ---
+
+app.post("/api/video/generate", async (req, res) => {
+  const { itemId } = req.body;
+  if (!itemId) return res.status(400).json({ error: "itemId required" });
+  res.json({ status: "running", itemId });
+  generateVideo(supabase, itemId).catch((err) =>
+    console.error("[Video] Fatal:", err)
+  );
+});
+
+app.get("/api/video/status/:itemId", async (req, res) => {
+  const { data, error } = await supabase
+    .from("items")
+    .select("media_video_url")
+    .eq("id", req.params.itemId)
+    .single();
+  if (error) return res.status(404).json({ error: "Not found" });
+  res.json({
+    status: data.media_video_url ? "done" : "pending",
+    videoUrl: data.media_video_url || null,
+    isPika: data.media_video_url?.includes("pika") ?? false,
   });
 });
 
