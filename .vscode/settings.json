@@ -3,6 +3,8 @@
         "dynamic-form-filling/.claude": true,
         "dynamic-form-filling/node_modules": true,
         ".claude": true,
-        ".vscode": true
+        ".vscode": true,
+        "facebook-messenger/node_modules": true,
+        "facebook-messenger/.claude": true
     }
 }
