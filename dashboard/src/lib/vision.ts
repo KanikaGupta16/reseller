@@ -25,7 +25,7 @@ export async function analyzeImage(base64: string): Promise<ProductInfo> {
           role: "system",
           content: `You are a product identification expert for resellers. Analyze the product photo and extract structured information. Do NOT estimate price. Return ONLY valid JSON with these fields:
 {
-  "title": "concise product title",
+  "title": "concise product title (naturally include the brand name if identifiable)",
   "brand": "brand name or null",
   "model": "model name/number or null",
   "category": "e.g. Electronics, Clothing, Shoes, Accessories, Home, Sports, Toys, Books, Other",

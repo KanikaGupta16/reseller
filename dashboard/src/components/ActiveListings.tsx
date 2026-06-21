@@ -15,6 +15,8 @@ interface Item {
   meetup_preferences: { door_pickup: boolean; door_dropoff: boolean; public_meetup: boolean } | null;
   media_urls: string[] | null;
   listed_on: string[] | null;
+  status: string | null;
+  pending_buyer: string | null;
   created_at: string;
 }
 
@@ -47,7 +49,19 @@ export default function ActiveListings() {
             <img src={item.image_url} alt="" style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>{item.title || "Untitled"}</h3>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <h3 style={{ margin: 0, fontSize: 16 }}>{item.title || "Untitled"}</h3>
+              <span style={{
+                fontSize: 11,
+                padding: "2px 8px",
+                borderRadius: 4,
+                fontWeight: 700,
+                background: item.status === "pending" ? "#fef3c7" : "#dcfce7",
+                color: item.status === "pending" ? "#92400e" : "#166534",
+              }}>
+                {item.status === "pending" ? `Pending${item.pending_buyer ? ` — ${item.pending_buyer}` : ""}` : "Available"}
+              </span>
+            </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
               {item.brand && <span className="tag">{item.brand}</span>}
               {item.category && <span className="tag">{item.category}</span>}

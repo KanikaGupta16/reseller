@@ -308,7 +308,7 @@ export default function ListingBuilder() {
                 color: publishResult.success ? "#16a34a" : "#ef4444",
                 fontSize: 13, fontWeight: 600,
               }}>
-                {publishResult.success ? "Listed on Facebook Marketplace" : "Publish failed"}: {publishResult.message}
+                {publishResult.success ? "Listing is active and being reviewed" : "Publish failed"}
               </div>
             )}
           </div>
@@ -328,7 +328,7 @@ export default function ListingBuilder() {
 
               {mediaUrls.length > 0 && (
                 <div>
-                  <label style={{ ...labelStyle, marginBottom: 8 }}>AI Lifestyle</label>
+                  <label style={{ ...labelStyle, marginBottom: 8 }}>Studio Render</label>
                   <img src={mediaUrls[0]} alt="Lifestyle" style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 8, background: "#F8F8F8" }} />
                 </div>
               )}
