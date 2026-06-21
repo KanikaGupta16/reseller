@@ -197,8 +197,6 @@ export default function ListingBuilder() {
   if (!selectedId) {
     return (
       <div>
-        <h2 style={{ fontWeight: 900, fontSize: "clamp(1.5rem,2.5vw,2rem)", letterSpacing: "-0.04em", textTransform: "lowercase", marginBottom: "0.5rem" }}>listing builder.</h2>
-        <p style={{ color: "var(--muted)", marginBottom: "1.75rem", fontSize: "var(--text-sm)" }}>Select an item to build its listing</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1.25rem" }}>
           {items.map((item) => (
             <div
@@ -401,7 +399,7 @@ export default function ListingBuilder() {
 
           </div>{/* /photos card */}
 
-          {/* Video card */}
+          {/* Video card — commented out for now
           <div className="card">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1.125rem 1.5rem", borderBottom: "1.5px solid var(--border)" }}>
               <div>
@@ -444,6 +442,7 @@ export default function ListingBuilder() {
               </div>
             )}
           </div>
+          */}
 
         </div>{/* /right column */}
       </div>

@@ -395,10 +395,10 @@ ${recentContext}`,
 
     let negotiationContext = "";
     if (pricing) {
+      const counterPrice = pricing.floorPrice + Math.round((pricing.listingPrice - pricing.floorPrice) * 0.3);
       negotiationContext = [
         `PRICING:`,
         `- Your listing price: $${pricing.listingPrice}`,
-        `- Your absolute minimum (floor): $${pricing.floorPrice}`,
         `- Buyer's offer: ${offerAmount ? `$${offerAmount}` : "unclear"}`,
         "",
       ].join("\n");
@@ -407,9 +407,9 @@ ${recentContext}`,
         if (offerAmount >= pricing.listingPrice) {
           negotiationContext += `STATUS: Offer is at or above listing price — ACCEPT.\n`;
         } else if (offerAmount >= pricing.floorPrice) {
-          negotiationContext += `STATUS: Offer is between floor and listing — counter or accept if close.\n`;
+          negotiationContext += `STATUS: Offer is close enough — you can accept or counter with $${counterPrice}.\n`;
         } else {
-          negotiationContext += `STATUS: Offer is BELOW floor of $${pricing.floorPrice} — DECLINE.\n`;
+          negotiationContext += `STATUS: Offer is too low — DECLINE and counter with $${counterPrice}.\n`;
         }
       }
     }
@@ -423,10 +423,11 @@ ${recentContext}`,
         "",
         "Negotiation rules:",
         "- NEVER accept or suggest a price below the floor price",
-        "- If below floor, decline and state your lowest is the floor price",
+        "- NEVER reveal or mention the exact minimum/floor price — instead say something like 'I can work on the price a bit' or counter with a specific amount",
+        "- If below floor, decline politely and counter with a price at or above the floor",
         "- If between floor and listing, counter or accept if close",
         "- If at or above listing, accept",
-        "- If they ask 'lowest/best price', give a price slightly above floor",
+        "- If they ask 'lowest/best price', give a price slightly above floor without saying it's your lowest",
         "- Be direct and brief — one or two sentences max",
         "- Sound like a real person, not a bot",
         "- No filler phrases",
@@ -451,7 +452,7 @@ ${recentContext}`,
         for (const p of replyPrices) {
           if (p < pricing.floorPrice && p > 0) {
             console.log(`[BuyerAgent] BLOCKED — $${p} below floor $${pricing.floorPrice}`);
-            return `Lowest I can do is $${pricing.floorPrice}.`;
+            return `I can do $${pricing.floorPrice} — let me know if that works for you.`;
           }
         }
       }

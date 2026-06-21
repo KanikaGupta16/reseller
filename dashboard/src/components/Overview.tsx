@@ -20,13 +20,6 @@ const STAT_TILES = [
   { key: "sold",        label: "Sold",          sub: "Deals closed",        emoji: "🎉", cls: "card-stat-pink",   nav: "active-listings" },
 ];
 
-const QUICK_ACTIONS = [
-  { label: "Upload",    emoji: "📷", tab: "upload",          desc: "Drop photos to analyse" },
-  { label: "Pricing",   emoji: "🔍", tab: "price-info",      desc: "Live market comps" },
-  { label: "Listing",   emoji: "🎬", tab: "listing-builder", desc: "Build & publish" },
-  { label: "Active",    emoji: "📦", tab: "active-listings", desc: "Live on marketplace" },
-  { label: "Messenger", emoji: "💬", tab: "messenger",       desc: "Reply to buyers" },
-];
 
 /* Section header matching the nav "Overview" style */
 const SectionHead = ({ accent, title, subtitle }: { accent: string; title: string; subtitle: string }) => (
@@ -151,26 +144,6 @@ export default function Overview({ onNavigate }: { onNavigate: (tab: string) => 
         </div>
       )}
 
-      {/* ══ Quick Actions ══ */}
-      <div>
-        <SectionHead accent="accent-upload" title="Quick Actions" subtitle="Jump to any step" />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.875rem" }}>
-          {QUICK_ACTIONS.map(a => (
-            <div key={a.tab} className="card"
-              style={{ cursor: "pointer", transition: "transform 0.14s, box-shadow 0.14s" }}
-              onClick={() => onNavigate(a.tab)}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 10px 30px rgba(0,0,0,0.08)"; }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = ""; }}
-            >
-              <div className="card-body" style={{ padding: "1.25rem", textAlign: "center" }}>
-                <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>{a.emoji}</div>
-                <div style={{ fontWeight: 900, fontSize: "var(--text-sm)", letterSpacing: "-0.02em", textTransform: "lowercase" }}>{a.label}</div>
-                <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginTop: "0.2rem" }}>{a.desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* ══ Recent Items ══ */}
       {recent.length > 0 && (

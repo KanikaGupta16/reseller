@@ -13,11 +13,11 @@ type Tab = "overview" | "price-info" | "listing-builder" | "active-listings" | "
 
 const TABS: { key: Tab; label: string; emoji: string; accent: string; sub: string }[] = [
   { key: "overview",        label: "Overview",  emoji: "📊", accent: "accent-overview",  sub: "Your reselling at a glance" },
+  { key: "upload",          label: "Upload",    emoji: "📷", accent: "accent-upload",    sub: "Add items & manage inventory" },
   { key: "price-info",      label: "Pricing",   emoji: "🔍", accent: "accent-pricing",   sub: "Scout live market comps" },
   { key: "listing-builder", label: "Listing",   emoji: "🎬", accent: "accent-listing",   sub: "Build & publish listings" },
   { key: "active-listings", label: "Active",    emoji: "📦", accent: "accent-active",    sub: "Live listings across platforms" },
   { key: "messenger",       label: "Messenger", emoji: "💬", accent: "accent-messenger", sub: "Buyer DMs & negotiations" },
-  { key: "upload",          label: "Upload",    emoji: "📷", accent: "accent-upload",    sub: "Add items & manage inventory" },
 ];
 
 export default function DashboardPage() {
@@ -57,15 +57,17 @@ export default function DashboardPage() {
       <main className="db-main">
 
         {/* Section header */}
-        <div className="db-section-header" style={{ marginBottom: "2rem" }}>
-          <div className="db-section-title-group">
-            <div className={`db-section-accent ${current.accent}`} />
-            <div>
-              <div className="db-section-title">{current.label}</div>
-              <div className="db-section-subtitle">{current.sub}</div>
+        {tab !== "overview" && (
+          <div className="db-section-header" style={{ marginBottom: "2rem" }}>
+            <div className="db-section-title-group">
+              <div className={`db-section-accent ${current.accent}`} />
+              <div>
+                <div className="db-section-title">{current.label}</div>
+                <div className="db-section-subtitle">{current.sub}</div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {tab === "overview" && (
           <Overview onNavigate={(t) => setTab(t as Tab)} />
