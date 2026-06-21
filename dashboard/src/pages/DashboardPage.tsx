@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Link } from "react-router-dom";
 import Overview from "../components/Overview";
 import PhotoUploader from "../components/PhotoUploader";
@@ -20,8 +21,12 @@ const TABS: { key: Tab; label: string; emoji: string; accent: string; sub: strin
 ];
 
 export default function DashboardPage() {
+  const [searchParams] = useSearchParams();
   const [refreshKey, setRefreshKey] = useState(0);
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = searchParams.get("tab");
+    return (TABS.some(x => x.key === t) ? t : "overview") as Tab;
+  });
   const current = TABS.find((t) => t.key === tab)!;
 
   return (
