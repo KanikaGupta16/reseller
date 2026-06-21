@@ -1,0 +1,550 @@
+'use client'
+
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createClient } from '@supabase/supabase-js'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
+const EDGE_FN = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/analyze-item`
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/*  Constants & mock data                                                   */
+/* ─────────────────────────────────────────────────────────────────────── */
+
+const SLIDE_COUNT = 5   // 0=hero 1=scout 2=studio 3=closer 4=upload
+
+const MOCK_ITEMS = [
+  { title: "Vintage Levi's 501 Jeans",  price: 68,  demand: 94, tags: ['vintage','denim','y2k'] },
+  { title: 'Nike Air Force 1 Low',       price: 115, demand: 88, tags: ['nike','af1','white'] },
+  { title: 'Coach Crossbody Bag',        price: 220, demand: 91, tags: ['coach','designer','brown'] },
+  { title: 'Ralph Lauren Polo Shirt',    price: 45,  demand: 82, tags: ['ralph','polo','preppy'] },
+]
+
+// Mock stats — will come from Supabase
+const STATS = { listed: 2847, revenue: 142320, avgHours: 4.2, acceptance: 98 }
+
+const LIVE_FEED = [
+  { icon: '📦', label: 'listed',  title: 'Jordan 1 Mid',        price: '$145', platform: 'Depop',     mins: 2  },
+  { icon: '✅', label: 'sold',    title: 'Coach Crossbody',      price: '$220', platform: 'FB',        mins: 5  },
+  { icon: '📦', label: 'listed',  title: "Vintage Levi's 501",   price: '$68',  platform: 'Depop',     mins: 8  },
+  { icon: '💬', label: 'offer',   title: 'Nike Air Force 1',     price: '$105', platform: 'FB',        mins: 11 },
+  { icon: '✅', label: 'sold',    title: 'Y2K Butterfly Top',    price: '$32',  platform: 'Vinted',    mins: 15 },
+]
+
+const SCOUT_TIPS  = ['🔍 Scanning 847 live listings...','📊 23 comparable items found','💰 Sweet spot: $45 – $68','✓ Scout is done']
+const STUDIO_TIPS = ['🎬 Writing your listing copy...','✓ Title crafted','✓ Description generated','📸 Photo tags added']
+const CLOSER_TIPS = ['🤝 Configuring Closer...','✓ Offer scoring ready','📅 Calendar synced','✅ All agents standing by']
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/*  SVG Curly arrows                                                        */
+/* ─────────────────────────────────────────────────────────────────────── */
+const CurlyRight = ({ c = 'currentColor' }: { c?: string }) => (
+  <svg width="78" height="46" viewBox="0 0 52 30" fill="none">
+    <path d="M3 19 C7 5 26 1 42 13" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+    <path d="M36 7 L42 13 L35 18" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+)
+const CurlyLeft = ({ c = 'currentColor' }: { c?: string }) => (
+  <svg width="78" height="46" viewBox="0 0 52 30" fill="none">
+    <path d="M49 19 C45 5 26 1 10 13" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+    <path d="M16 7 L10 13 L17 18" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+)
+const CurlyDown = ({ c = 'currentColor' }: { c?: string }) => (
+  <svg width="42" height="74" viewBox="0 0 28 50" fill="none">
+    <path d="M9 3 C23 7 27 26 15 43" stroke={c} strokeWidth="1.8" strokeLinecap="round"/>
+    <path d="M9 36 L15 43 L21 36" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+)
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/*  Animated counter                                                        */
+/* ─────────────────────────────────────────────────────────────────────── */
+function AnimatedNum({ target, prefix = '', suffix = '', isActive }: {
+  target: number; prefix?: string; suffix?: string; isActive: boolean
+}) {
+  const [val, setVal] = useState(0)
+  useEffect(() => {
+    if (!isActive) { setVal(0); return }
+    const start = performance.now(), dur = 1800
+    let rafId: number
+    const tick = (now: number) => {
+      const p = Math.min((now - start) / dur, 1)
+      const e = 1 - Math.pow(1 - p, 3)
+      setVal(Math.floor(e * target))
+      if (p < 1) rafId = requestAnimationFrame(tick)
+      else setVal(target)
+    }
+    rafId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(rafId)
+  }, [isActive, target])
+  return <>{prefix}{val.toLocaleString()}{suffix}</>
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/*  Agent row                                                               */
+/* ─────────────────────────────────────────────────────────────────────── */
+type AgentState = 'idle' | 'working' | 'done'
+function AgentRow({ icon, name, label, state, delay }: {
+  icon: string; name: string; label: string; state: AgentState; delay: number
+}) {
+  return (
+    <div className={`agent-row agent-row--${state}`} style={{ animationDelay: `${delay * 0.2}s` }}>
+      <span className="agent-row-icon">{icon}</span>
+      <div className="agent-row-body">
+        <span className="agent-row-name">{name}</span>
+        <span className="agent-row-label">{label}</span>
+      </div>
+      {state === 'idle'    && <span className="agent-dot agent-dot--idle" />}
+      {state === 'working' && <span className="agent-dot agent-dot--pulse" />}
+      {state === 'done'    && <span className="agent-check">✓</span>}
+    </div>
+  )
+}
+
+/* ─────────────────────────────────────────────────────────────────────── */
+/*  Main page                                                               */
+/* ─────────────────────────────────────────────────────────────────────── */
+export default function Home() {
+  const stageRef    = useRef<HTMLDivElement>(null)
+  const fileInputRef= useRef<HTMLInputElement>(null)
+  const waveRef     = useRef<HTMLCanvasElement>(null)
+  const slideRef    = useRef(0)
+  const locked      = useRef(false)
+
+  const [slide, setSlide]           = useState(0)
+  const [uploadStep, setUploadStep] = useState<'idle' | 'processing' | 'done'>('idle')
+  const [uploadedImg, setUploadedImg] = useState<string | null>(null)
+  const [dragOver, setDragOver]     = useState(false)
+  const [scout,  setScout]          = useState<AgentState>('idle')
+  const [studio, setStudio]         = useState<AgentState>('idle')
+  const [closer, setCloser]         = useState<AgentState>('idle')
+  const [item]                      = useState(() => MOCK_ITEMS[Math.floor(Math.random() * MOCK_ITEMS.length)])
+  const [realItem, setRealItem]     = useState<{ title: string; tags: string[] } | null>(null)
+  const [accessToken, setAccessToken] = useState<string | null>(null)
+
+  /* waveform canvas */
+  useEffect(() => {
+    let id: number
+    const wc = waveRef.current; if (!wc) return
+    const ctx = wc.getContext('2d')!
+    const N = 40
+    const hs = Array.from({ length: N }, (_, i) => 3 + Math.abs(Math.sin(i * 0.55)) * 18)
+    const sp = Array.from({ length: N }, () => 0.03 + Math.random() * 0.04)
+    const of = Array.from({ length: N }, (_, i) => i * 0.32)
+    const draw = (ts: number) => {
+      const T = ts / 1000; ctx.clearRect(0, 0, wc.width, wc.height)
+      const bW = 3, gap = 3, tot = N*(bW+gap)-gap, sx = (wc.width-tot)/2, cy = wc.height/2
+      for (let i = 0; i < N; i++) {
+        const h = hs[i]*(0.3+0.7*Math.abs(Math.sin(T*sp[i]+of[i])))
+        const x = sx+i*(bW+gap), a = 0.5+0.5*(h/hs[i])
+        ctx.fillStyle = `rgba(8,8,8,${a})`
+        ctx.beginPath()
+        if (ctx.roundRect) ctx.roundRect(x, cy-h/2, bW, h, 100)
+        else ctx.rect(x, cy-h/2, bW, h)
+        ctx.fill()
+      }
+      id = requestAnimationFrame(draw)
+    }
+    id = requestAnimationFrame(draw)
+    return () => cancelAnimationFrame(id)
+  }, [])
+
+  /* ─── anonymous auth (enable in Supabase dashboard: Auth → Providers → Anonymous) ─── */
+  // useEffect(() => {
+  //   supabase.auth.getSession().then(async ({ data: { session } }) => {
+  //     if (session) { setAccessToken(session.access_token); return }
+  //     const { data } = await supabase.auth.signInAnonymously()
+  //     if (data.session) setAccessToken(data.session.access_token)
+  //   })
+  // }, [])
+
+  /* ─── wheel intercept ─── */
+  const goTo = useCallback((idx: number) => {
+    if (locked.current) return
+    if (idx >= SLIDE_COUNT) {
+      // Exit slides → scroll to agents section
+      document.getElementById('below-fold')?.scrollIntoView({ behavior: 'smooth' })
+      return
+    }
+    if (idx < 0) return
+    locked.current = true
+    slideRef.current = idx
+    setSlide(idx)
+    setTimeout(() => { locked.current = false }, 680)
+  }, [])
+
+  useEffect(() => {
+    const onWheel = (e: WheelEvent) => {
+      if (window.scrollY > 60) return   // user has scrolled past stage → don't intercept
+      e.preventDefault()
+      if (e.deltaY > 4)  goTo(slideRef.current + 1)
+      if (e.deltaY < -4) goTo(slideRef.current - 1)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (window.scrollY > 60) return
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') goTo(slideRef.current + 1)
+      if (e.key === 'ArrowUp'  || e.key === 'ArrowLeft')  goTo(slideRef.current - 1)
+    }
+    // Touch
+    let ty0 = 0
+    const onTouchStart = (e: TouchEvent) => { ty0 = e.touches[0].clientY }
+    const onTouchEnd   = (e: TouchEvent) => {
+      if (window.scrollY > 60) return
+      const dy = ty0 - e.changedTouches[0].clientY
+      if (Math.abs(dy) < 40) return
+      e.preventDefault()
+      if (dy > 0) goTo(slideRef.current + 1)
+      else goTo(slideRef.current - 1)
+    }
+    window.addEventListener('wheel', onWheel, { passive: false })
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('touchstart', onTouchStart, { passive: true })
+    window.addEventListener('touchend', onTouchEnd, { passive: false })
+    return () => {
+      window.removeEventListener('wheel', onWheel)
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('touchstart', onTouchStart)
+      window.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [goTo])
+
+  /* ─── upload flow ─── */
+  const handleFile = useCallback(async (file: File) => {
+    if (!file.type.startsWith('image/')) return
+
+    // Show local preview immediately
+    const reader = new FileReader()
+    reader.onload = e => setUploadedImg(e.target?.result as string)
+    reader.readAsDataURL(file)
+
+    setRealItem(null)
+    setScout('idle'); setStudio('idle'); setCloser('idle')
+    setUploadStep('processing')
+    setScout('working')
+
+    try {
+      const formData = new FormData()
+      formData.append('images', file)
+
+      const res = await fetch(EDGE_FN, {
+        method: 'POST',
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+        body: formData,
+      })
+
+      const data = await res.json()
+
+      // Animate through Studio → Closer with real results at the end
+      setScout('done'); setStudio('working')
+      setTimeout(() => { setStudio('done'); setCloser('working') }, 900)
+      setTimeout(() => {
+        setCloser('done')
+        setRealItem({
+          title: data.title || item.title,
+          tags: data.attributes?.style_tags || item.tags,
+        })
+        setUploadStep('done')
+      }, 1800)
+    } catch {
+      // Fallback: mock animation
+      setTimeout(() => { setScout('done'); setStudio('working') }, 1600)
+      setTimeout(() => { setStudio('done'); setCloser('working') }, 3000)
+      setTimeout(() => { setCloser('done'); setUploadStep('done') }, 4200)
+    }
+  }, [accessToken, item])
+
+  const resetUpload = () => {
+    setUploadStep('idle'); setUploadedImg(null); setRealItem(null)
+    setScout('idle'); setStudio('idle'); setCloser('idle')
+  }
+
+  const scrollToCta = () => document.getElementById('cta-email')?.focus()
+
+  /* panel class helper */
+  const cls = (n: number) =>
+    `sp ${slide === n ? 'sp--on' : slide > n ? 'sp--prev' : 'sp--next'}`
+
+  /* ─── tips for upload right panel ─── */
+  const tips: string[] = []
+  if (scout  !== 'idle') tips.push(...SCOUT_TIPS.slice(0, scout  === 'done' ? 4 : 1))
+  if (studio !== 'idle') tips.push(...STUDIO_TIPS.slice(0, studio === 'done' ? 4 : 1))
+  if (closer !== 'idle') tips.push(...CLOSER_TIPS.slice(0, closer === 'done' ? 4 : 1))
+
+  return (
+    <>
+      {/* ── NAV ── */}
+      <nav className={`nav ${slide === 0 ? 'nav--dark' : 'nav--light'}`}>
+        <a href="#" className="logo">reseller.</a>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <a href="/dashboard" className="dashboard-btn">Dashboard</a>
+          <button className={`pill ${slide === 0 ? 'pill-white' : ''}`} onClick={scrollToCta}>
+            Get Access
+          </button>
+        </div>
+      </nav>
+
+      {/* ── STICKY STAGE (100vh, intercepted by wheel) ── */}
+      <div ref={stageRef} className="stage">
+
+        {/* ─── SLIDE 0: HERO ─── */}
+        <div className={cls(0)} style={{ display: 'block' }}>
+          <div className="hero-bg">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/closet.avif" alt="Pile of clothes to sell" />
+            <div className="hero-grad" />
+          </div>
+          <div className="hero-copy">
+            <div className="hero-badge">
+              <span className="bdot" /> AI-Powered Reselling · Beta
+            </div>
+            <h1 className="hero-h1">
+              your pile is<br /><em>money</em><br />waiting. 💸
+            </h1>
+            <p className="hero-sub">Scout prices it. Studio lists it. Closer sells it. Just upload a photo.</p>
+            <div className="hero-ctas">
+              <button className="pill pill-white pill-big" onClick={() => goTo(5)}>Let&apos;s start →</button>
+              <button className="pill pill-big pill-ow" onClick={() => goTo(1)}>See how it works</button>
+            </div>
+          </div>
+          <div className="hero-mark" aria-hidden="true">reseller.</div>
+          <button className="scroll-cue" onClick={() => goTo(1)} aria-label="Next">
+            <CurlyDown c="rgba(255,255,255,0.55)" />
+            <span>scroll</span>
+          </button>
+        </div>
+
+        {/* ─── SLIDE 1: SCOUT (blue) ─── */}
+        <div className={cls(1)} style={{ background: 'var(--blue)' }}>
+          <div className="split">
+            <div className="sl sl--blue">
+              <div className="step-lbl">01 / scout</div>
+              <h2 className="sl-h2">priced before<br />you post. <em>🔍</em></h2>
+              <p className="sl-p">Scout scans live Depop, eBay, and FB Marketplace in real time to find the price that sells fast — not the one that sits.</p>
+              <div className="price-badge" style={{ marginTop: '1rem' }}>
+                $187 <span className="pl">Scout says</span>
+              </div>
+            </div>
+            <div className="sr" style={{ background: 'var(--blue)' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/sneaker.avif" alt="Sneaker" className="blend" />
+            </div>
+          </div>
+        </div>
+
+        {/* ─── SLIDE 2: STUDIO (pink) ─── */}
+        <div className={cls(2)} style={{ background: 'var(--pink)' }}>
+          <div className="split">
+            <div className="sl sl--pink">
+              <div className="step-lbl">02 / studio</div>
+              <h2 className="sl-h2">listed in<br />60 seconds. <em>🎬</em></h2>
+              <p className="sl-p">Studio writes the title, description, and tags — then generates a 15-second product video and posts to every platform at once.</p>
+              <button className="pill pill-big" style={{ marginTop: '1rem' }}>See Studio in action</button>
+            </div>
+            <div className="sr" style={{ background: 'var(--pink)' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/blazer.avif" alt="Pink blazer listing" className="blend" />
+            </div>
+          </div>
+        </div>
+
+        {/* ─── SLIDE 3: CLOSER (yellow) ─── */}
+        <div className={cls(3)} style={{ background: 'var(--yellow)' }}>
+          <div className="split">
+            <div className="sl sl--yellow">
+              <div className="step-lbl">03 / closer</div>
+              <h2 className="sl-h2">sold while<br />you sleep. <em>🤝</em></h2>
+              <p className="sl-p">Closer lives in your DMs. It scores every offer, counters automatically, and books the meetup from your calendar. You never type a reply.</p>
+              <div className="dm-thread" style={{ marginTop: '1.5rem' }}>
+                <div className="dm dm-b">&quot;is $50 your lowest?&quot;</div>
+                <div className="dm dm-a">I can do $62 — priced under market. Meet Saturday in Williamsburg? 🤝</div>
+                <div className="dm dm-b">&quot;deal! saturday works 🙌&quot;</div>
+              </div>
+            </div>
+            <div className="sr" style={{ background: 'var(--yellow)', position: 'relative' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/polaroids.avif" alt="Fashion polaroids" className="blend" />
+              <canvas ref={waveRef} width={260} height={44}
+                style={{ position: 'absolute', bottom: '2rem', left: '50%', transform: 'translateX(-50%)', display: 'block' }} />
+            </div>
+          </div>
+        </div>
+
+        {/* ─── SLIDE 4: UPLOAD (white) ─── */}
+        <div className={cls(4)} style={{ background: '#fff' }}>
+          <div className="split">
+            {/* Left */}
+            <div className="sl sl--upload">
+              {uploadStep === 'idle' && <>
+                <div className="step-lbl">let&apos;s start.</div>
+                <h2 className="sl-h2">upload a photo<br />of your item. <em>📸</em></h2>
+                <p className="sl-p">Anything from your closet, haul, or shelf. Scout will have a price in seconds.</p>
+                <div
+                  className={`drop-zone ${dragOver ? 'dz--over' : ''}`}
+                  onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
+                  onClick={() => fileInputRef.current?.click()}
+                  role="button" tabIndex={0}
+                  onKeyDown={e => e.key === 'Enter' && fileInputRef.current?.click()}
+                >
+                  <span className="dz-icon">📷</span>
+                  <span className="dz-label">drag & drop or click to upload</span>
+                  <span className="dz-hint">jpg · png · webp</span>
+                </div>
+                <input ref={fileInputRef} type="file" accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+              </>}
+
+              {uploadStep === 'processing' && <>
+                <div className="step-lbl">agents working...</div>
+                <h2 className="sl-h2">analysing<br />your item. <em>⚡</em></h2>
+                <div className="agent-status-list">
+                  <AgentRow icon="🔍" name="Scout"  label="scanning live comps"     state={scout}  delay={0} />
+                  <AgentRow icon="🎬" name="Studio" label="writing listing + video" state={studio} delay={1} />
+                  <AgentRow icon="🤝" name="Closer" label="setting up DM replies"   state={closer} delay={2} />
+                </div>
+              </>}
+
+              {uploadStep === 'done' && <>
+                <div className="step-lbl">✅ done!</div>
+                <h2 className="sl-h2">your listing<br />is <em>live.</em> 🎉</h2>
+                <div className="result-card">
+                  <div className="rc-badge">✅ ready to push</div>
+                  <div className="rc-title">{realItem?.title ?? item.title}</div>
+                  <div className="rc-row">
+                    <div>
+                      <div className="rc-price">${item.price}</div>
+                      <div className="rc-price-lbl">Scout&apos;s price</div>
+                    </div>
+                    <div className="rc-demand">
+                      <span className="rc-bar" style={{ '--pct': `${item.demand}%` } as React.CSSProperties} />
+                      <span className="rc-demand-lbl">{item.demand}% demand</span>
+                    </div>
+                  </div>
+                  <div className="chip-row" style={{ justifyContent: 'flex-start', marginTop: '0.75rem' }}>
+                    {(realItem?.tags ?? item.tags).map(t => <span key={t} className="chip">{t}</span>)}
+                  </div>
+                </div>
+                <div className="rc-ctas">
+                  <button className="pill pill-big" style={{ background: 'var(--pink-2)' }}>Push live →</button>
+                  <button className="pill pill-big pill-outline" onClick={resetUpload}>Try another</button>
+                </div>
+              </>}
+            </div>
+
+            {/* Right — tips / preview */}
+            <div className="sr sr--upload">
+              {uploadStep === 'idle' && (
+                <div className="upload-idle-right">
+                  <span className="uir-icon">🏷️</span>
+                  <span className="uir-text">your item goes here</span>
+                </div>
+              )}
+
+              {(uploadStep === 'processing' || uploadStep === 'done') && uploadedImg && (
+                <div className="upload-preview-wrap">
+                  <div className="upload-preview-col">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={uploadedImg} alt="Your item" className="upload-img" />
+                    {uploadStep === 'done' && (
+                      <div className="upload-done-badge">listed on depop + fb 🎉</div>
+                    )}
+                  </div>
+                  <div className="tips-col">
+                    {tips.map((t, i) => (
+                      <div key={i} className="tip" style={{ animationDelay: `${i * 0.22}s` }}>{t}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Navigation bar (hidden on hero) ── */}
+        {slide > 0 && (
+          <div className={`snav ${slide >= 4 ? 'snav--dark' : ''}`}>
+            <button className="sarrow" onClick={() => goTo(slide - 1)} aria-label="Previous">
+              <CurlyLeft c={slide >= 4 ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.4)'} />
+              <span className="sarrow-lbl">back</span>
+            </button>
+            <div className="sdots">
+              {Array.from({ length: SLIDE_COUNT - 1 }, (_, i) => i + 1).map(n => (
+                <button key={n}
+                  className={`sdot ${slide === n ? 'sdot--on' : ''}`}
+                  onClick={() => { goTo(n); if (n !== 4) resetUpload() }}
+                  aria-label={`Slide ${n}`}
+                />
+              ))}
+            </div>
+            <button className="sarrow" onClick={() => goTo(slide + 1)} aria-label="Next">
+              <span className="sarrow-lbl">{slide < SLIDE_COUNT - 1 ? 'next' : 'done ↓'}</span>
+              <CurlyRight c="rgba(0,0,0,0.4)" />
+            </button>
+          </div>
+        )}
+
+      </div>{/* /stage */}
+
+      {/* ── REST OF PAGE ── */}
+      <div id="below-fold">
+        <div className="ticker-wrap" aria-hidden="true">
+          <div className="ticker-track">
+            {['upload your item','scout prices it','studio lists it','closer negotiates','depop + fb marketplace','supabase backend'].flatMap((t, i) => [
+              <span key={`a${i}`} className="tick">{t} <span className="tick-dot">●</span></span>,
+              <span key={`b${i}`} className="tick">{t} <span className="tick-dot">●</span></span>,
+            ])}
+          </div>
+        </div>
+
+        <section className="agents-section" id="agents">
+          <div className="section-label">how it works</div>
+          <h2 className="big-head">snap it.<br /><em>it handles the rest.</em></h2>
+          <div className="agents-grid">
+            {[
+              { icon: '🔍', cls: 'c-blue', num: '01', name: 'scout',  desc: 'Takes your photo, uses AI vision to identify the item, then scrapes Depop, eBay, Facebook, Mercari, Poshmark and more to find what it actually sells for.', tags: ['GPT-4o Vision','Live Scraping','Price Range'] },
+              { icon: '🎬', cls: 'c-pink', num: '02', name: 'studio', desc: 'Writes the title, description and tags. Generates lifestyle photos with AI. Builds a complete listing ready to publish — no copywriting, no photography.', tags: ['AI Copywriting','Image Generation','Listing Builder'] },
+              { icon: '🤝', cls: 'c-yell', num: '03', name: 'closer', desc: 'Posts to Facebook Marketplace automatically. Monitors your Messenger inbox, reads buyer messages, and replies — so deals close while you do other things.', tags: ['FB Marketplace','Auto-Messaging','Negotiation'] },
+            ].map(a => (
+              <div key={a.name} className="agent-card">
+                <div className={`orbit-circle ${a.cls}`}>{a.icon}<div className="ring" /></div>
+                <div><div className="agent-num">Agent {a.num}</div><div className="agent-name">{a.name}</div></div>
+                <p className="agent-p">{a.desc}</p>
+                <div className="chip-row">{a.tags.map(t => <span key={t} className="chip">{t}</span>)}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="photo-section photo-section--cta">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/flatlay.avif" alt="Luxury resale items" className="fill-img photo-img" />
+          <div className="photo-overlay photo-overlay--pink" />
+          <div className="photo-content photo-content--center">
+            <h2 className="big-head" style={{ color: 'var(--white)', textAlign: 'center' }}>
+              your stuff,<br /><em style={{ color: 'var(--yellow)' }}>sold.</em> ✨<br />while you sleep.
+            </h2>
+            <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.9375rem', lineHeight: 1.65, maxWidth: 360, textAlign: 'center', margin: '0 auto 2.5rem' }}>
+              Join the waitlist. Opening platform by platform, starting with Depop and FB Marketplace.
+            </p>
+            <div className="cta-form">
+              <input id="cta-email" type="email" placeholder="your@email.com" aria-label="Email for waitlist" />
+              <button type="button">Join waitlist</button>
+            </div>
+            <p className="cta-note">We will never save or store your location data.</p>
+          </div>
+        </section>
+
+        <footer>
+          <a href="#" className="footer-logo">reseller.</a>
+          <span className="footer-r">Built at a hackathon · 2026</span>
+        </footer>
+      </div>
+    </>
+  )
+}
