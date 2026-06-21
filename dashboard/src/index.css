@@ -122,9 +122,9 @@ body {
 .card-stat {
   border-radius: var(--radius-md);
   padding: 1.75rem;
-  display: flex; flex-direction: column; gap: 0.625rem;
+  display: flex; flex-direction: column;
+  min-height: 160px;
   transition: transform 0.14s, box-shadow 0.14s;
-  cursor: pointer;
 }
 .card-stat:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.12); }
 
