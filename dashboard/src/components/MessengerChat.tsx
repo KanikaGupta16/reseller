@@ -16,7 +16,15 @@ interface Message {
   isMe: boolean;
 }
 
+interface AgentLog {
+  conversationId: string;
+  question: string;
+  reply: string;
+  timestamp: number;
+}
+
 const API = "http://localhost:3001/api/messenger";
+const AGENT_API = "http://localhost:3001/api/buyer-agent";
 
 export default function MessengerChat() {
   const [status, setStatus] = useState<
@@ -31,6 +39,8 @@ export default function MessengerChat() {
   const [sending, setSending] = useState(false);
   const [loadingConvs, setLoadingConvs] = useState(false);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
+  const [agentRunning, setAgentRunning] = useState(false);
+  const [agentLog, setAgentLog] = useState<AgentLog[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,6 +51,20 @@ export default function MessengerChat() {
         setError(data.error);
       })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const fetchAgentStatus = async () => {
+      try {
+        const res = await fetch(`${AGENT_API}/status`);
+        const data = await res.json();
+        setAgentRunning(data.running);
+        setAgentLog(data.log || []);
+      } catch {}
+    };
+    fetchAgentStatus();
+    const interval = setInterval(fetchAgentStatus, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -104,6 +128,17 @@ export default function MessengerChat() {
     setConversations([]);
     setMessages([]);
     setSelectedConv(null);
+  };
+
+  const handleAgentToggle = async () => {
+    try {
+      const endpoint = agentRunning ? "stop" : "start";
+      const res = await fetch(`${AGENT_API}/${endpoint}`, { method: "POST" });
+      const data = await res.json();
+      setAgentRunning(data.running);
+    } catch (err: any) {
+      console.error("Agent toggle failed:", err);
+    }
   };
 
   const handleSend = async () => {
@@ -200,6 +235,56 @@ export default function MessengerChat() {
           </button>
         )}
       </div>
+
+      {/* Buyer Agent Bar */}
+      {status === "connected" && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "10px 16px",
+            background: agentRunning ? "#0f2a1f" : "#12121e",
+            borderRadius: 8,
+            marginBottom: 16,
+            border: agentRunning ? "1px solid #166534" : "1px solid #2a2a3a",
+          }}
+        >
+          <div
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: agentRunning ? "#4ade80" : "#555",
+              boxShadow: agentRunning ? "0 0 6px #4ade80" : "none",
+              flexShrink: 0,
+            }}
+          />
+          <span style={{ color: "#ccc", fontSize: 13, flex: 1 }}>
+            <strong>Buyer Reply Agent</strong>
+            <span style={{ color: "#888", marginLeft: 8 }}>
+              {agentRunning
+                ? `Auto-replying to questions (${agentLog.length} replies sent)`
+                : "Off"}
+            </span>
+          </span>
+          <button
+            onClick={handleAgentToggle}
+            style={{
+              padding: "5px 14px",
+              background: agentRunning ? "#991b1b" : "#166534",
+              color: "#fff",
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            {agentRunning ? "Stop Agent" : "Start Agent"}
+          </button>
+        </div>
+      )}
 
       {status !== "connected" && (
         <div style={{ color: "#666", textAlign: "center", marginTop: 60 }}>
@@ -301,6 +386,24 @@ export default function MessengerChat() {
                 </div>
               </div>
             ))}
+            {/* Agent Activity Log */}
+            {agentRunning && agentLog.length > 0 && (
+              <div style={{ borderTop: "1px solid #2a2a3a", padding: "12px 16px" }}>
+                <div style={{ fontSize: 11, color: "#4ade80", fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>
+                  Agent Activity
+                </div>
+                {agentLog.slice(-5).reverse().map((entry, i) => (
+                  <div key={i} style={{ marginBottom: 8, fontSize: 12 }}>
+                    <div style={{ color: "#888" }}>
+                      Q: <span style={{ color: "#aaa" }}>{entry.question}</span>
+                    </div>
+                    <div style={{ color: "#4ade80" }}>
+                      A: {entry.reply}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Message Thread */}

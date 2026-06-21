@@ -5,6 +5,7 @@ import { runResearch } from "./research";
 import { generateMedia, buildFinalListing } from "./media";
 import { publishToFacebook } from "./facebook";
 import { messengerSession } from "./messenger";
+import { buyerAgent } from "./buyer-agent";
 
 const app = express();
 app.use(cors());
@@ -252,6 +253,34 @@ app.post("/api/messenger/disconnect", async (_req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// --- Buyer Agent endpoints ---
+
+app.post("/api/buyer-agent/start", (_req, res) => {
+  buyerAgent.start();
+  res.json({ running: true });
+});
+
+app.post("/api/buyer-agent/stop", (_req, res) => {
+  buyerAgent.stop();
+  res.json({ running: false });
+});
+
+app.get("/api/buyer-agent/status", (_req, res) => {
+  res.json({ running: buyerAgent.running, log: buyerAgent.log, pendingDeals: buyerAgent.pendingDeals });
+});
+
+app.get("/api/buyer-agent/deals", (_req, res) => {
+  res.json({ deals: buyerAgent.pendingDeals });
+});
+
+app.post("/api/buyer-agent/deals/:id/finalize", async (req, res) => {
+  const deal = buyerAgent.getPendingDeal(req.params.id);
+  if (!deal) return res.status(404).json({ error: "Deal not found" });
+  if (deal.status !== "ready") return res.status(400).json({ error: "Deal not ready — missing time or location" });
+  buyerAgent.markDealCalendarCreated(req.params.id);
+  res.json({ deal });
 });
 
 const PORT = 3001;

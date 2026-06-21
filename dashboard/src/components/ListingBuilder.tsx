@@ -21,6 +21,7 @@ interface Item {
 interface ListingOutput {
   title: string;
   price: number;
+  min_negotiation_price: number | null;
   category: string;
   condition: string;
   location: string;
@@ -40,7 +41,7 @@ export default function ListingBuilder() {
   const [items, setItems] = useState<Item[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [form, setForm] = useState<ListingOutput>({
-    title: "", price: 0, category: "", condition: "",
+    title: "", price: 0, min_negotiation_price: null, category: "", condition: "",
     location: "", description: "",
     meetup_preferences: { door_pickup: false, door_dropoff: false, public_meetup: false },
   });
@@ -48,7 +49,7 @@ export default function ListingBuilder() {
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
-  const [showJson, setShowJson] = useState(false);
+
   const [publishing, setPublishing] = useState(false);
   const [publishStep, setPublishStep] = useState("");
   const [publishResult, setPublishResult] = useState<{ success: boolean; message: string } | null>(null);
@@ -70,6 +71,7 @@ export default function ListingBuilder() {
     setForm({
       title: item.title || "",
       price: item.listing_price ?? item.research_suggested_price ?? 0,
+      min_negotiation_price: null,
       category: item.category || "",
       condition: item.condition || "",
       location: item.location || "San Francisco, CA",
@@ -78,7 +80,6 @@ export default function ListingBuilder() {
     });
     setMediaUrls(item.media_urls || []);
     setOriginalImageUrl(item.image_url);
-    setShowJson(false);
     setSaveStatus("idle");
     setPublishing(false);
     setPublishStep("");
@@ -110,6 +111,7 @@ export default function ListingBuilder() {
           itemId: selectedId,
           title: form.title,
           price: Number(form.price),
+          min_negotiation_price: form.min_negotiation_price ?? Math.round(form.price * 0.8),
           category: form.category,
           condition: form.condition,
           location: form.location,
@@ -161,20 +163,6 @@ export default function ListingBuilder() {
       setPublishing(false);
       setPublishResult({ success: false, message: "Failed to start publish" });
     }
-  };
-
-  const finalOutput = {
-    title: form.title,
-    price: Number(form.price),
-    category: form.category,
-    condition: form.condition,
-    location: form.location,
-    description: form.description,
-    meetup_preferences: form.meetup_preferences,
-    media: {
-      original: originalImageUrl,
-      generated_images: mediaUrls,
-    },
   };
 
   if (!selectedId) {
@@ -240,6 +228,29 @@ export default function ListingBuilder() {
             <label style={labelStyle}>Price ($)</label>
             <input style={inputStyle} type="number" step="0.01" value={form.price} onChange={(e) => updateField("price", parseFloat(e.target.value) || 0)} />
 
+            <label style={labelStyle}>Min Negotiation Price ($)</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                style={{ ...inputStyle, marginBottom: 0 }}
+                type="number"
+                step="0.01"
+                value={form.min_negotiation_price ?? Math.round(form.price * 0.8)}
+                onChange={(e) => updateField("min_negotiation_price", parseFloat(e.target.value) || 0)}
+              />
+              {form.min_negotiation_price !== null && (
+                <button
+                  onClick={() => updateField("min_negotiation_price", null)}
+                  className="btn"
+                  style={{ background: "#222", color: "#888", fontSize: 11, padding: "6px 10px", whiteSpace: "nowrap" }}
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            <span style={{ fontSize: 11, color: "#666", marginTop: 2, display: "block" }}>
+              {form.min_negotiation_price === null ? "Auto: 80% of listing price" : "Custom override"}
+            </span>
+
             <label style={labelStyle}>Category</label>
             <select style={inputStyle} value={form.category} onChange={(e) => updateField("category", e.target.value)}>
               <option value="">Select...</option>
@@ -272,16 +283,13 @@ export default function ListingBuilder() {
               <button onClick={saveListing} disabled={saving} className="btn btn-primary">
                 {saving ? "Saving..." : "Save Listing"}
               </button>
-              <button onClick={() => setShowJson(!showJson)} className="btn" style={{ background: "#222", color: "#aaa" }}>
-                {showJson ? "Hide" : "View"} JSON
-              </button>
               <button
                 onClick={publishToFacebook}
                 disabled={publishing || saving}
                 className="btn"
                 style={{ background: "#1877f2", color: "#fff" }}
               >
-                {publishing ? "Publishing..." : "Publish to Facebook"}
+                {publishing ? "Publishing..." : "Publish to Facebook Marketplace"}
               </button>
             </div>
 
@@ -313,14 +321,6 @@ export default function ListingBuilder() {
             )}
           </div>
 
-          {showJson && (
-            <div className="card" style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: "0 0 8px", fontSize: 14, color: "#888" }}>Final Listing Output</h3>
-              <pre style={{ margin: 0, fontSize: 12, color: "#4ecdc4", whiteSpace: "pre-wrap", overflowX: "auto" }}>
-                {JSON.stringify(finalOutput, null, 2)}
-              </pre>
-            </div>
-          )}
         </div>
 
         {/* Right column: Media */}

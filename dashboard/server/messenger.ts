@@ -1,6 +1,30 @@
 import { exec } from "child_process";
+import { chromium, type Browser, type Page } from "playwright-core";
 
 const SESSION = "default";
+let cdpBrowser: Browser | null = null;
+let cdpPage: Page | null = null;
+
+async function getCdpPage(): Promise<Page> {
+  if (cdpPage) {
+    try {
+      await cdpPage.title();
+      return cdpPage;
+    } catch {
+      cdpBrowser = null;
+      cdpPage = null;
+    }
+  }
+
+  cdpBrowser = await chromium.connectOverCDP("http://localhost:9222");
+  const contexts = cdpBrowser.contexts();
+  const pages = contexts.length > 0 ? contexts[0].pages() : [];
+  const messengerPage = pages.find(p => p.url().includes("messenger.com")) || pages[0];
+  if (!messengerPage) throw new Error("No Messenger page found in Chrome");
+  cdpPage = messengerPage;
+  console.log("[Messenger] Playwright connected via CDP");
+  return cdpPage;
+}
 
 export interface Conversation {
   id: string;
@@ -197,16 +221,29 @@ class MessengerSession {
     return this.withLock(async () => {
       this.ensureConnected();
 
-      if (this.currentConversationName !== conversationId) {
-        const snap = parseSnapshot(await browse(["snapshot", "--compact", "-s", SESSION], 20000));
-        const clickRef = this.findConversationRef(snap, conversationId);
+      // Check if we need to click into this conversation
+      const snap = parseSnapshot(await browse(["snapshot", "--compact", "-s", SESSION], 20000));
+      const originalName = this.conversationNameMap.get(conversationId) || conversationId;
+      const alreadyOpen = snap.includes("textbox:") && snap.includes(originalName) &&
+        this.currentConversationName === conversationId;
 
-        if (clickRef) {
-          await browse(["click", `@${clickRef}`, "-s", SESSION]);
-        } else {
-          console.log(`[Messenger] Could not find conversation "${conversationId}" in snapshot`);
+      if (!alreadyOpen) {
+        console.log(`[Messenger] Opening conversation: "${originalName}"`);
+        try {
+          const page = await getCdpPage();
+          const link = page.locator(`a[role="link"]`).filter({ hasText: originalName }).first();
+          await link.click({ timeout: 5000 });
+          await page.waitForTimeout(2000);
+        } catch (err: any) {
+          console.error(`[Messenger] Playwright click failed: ${err.message}, trying fallback`);
+          try {
+            const page = await getCdpPage();
+            await page.locator(`[data-testid="mwthreadlist-item"]`).filter({ hasText: originalName }).first().click({ timeout: 5000 });
+            await page.waitForTimeout(2000);
+          } catch {
+            console.error(`[Messenger] Fallback click also failed`);
+          }
         }
-        await browse(["wait", "timeout", "3000", "-s", SESSION]);
         this.currentConversationName = conversationId;
       }
 
@@ -290,16 +327,18 @@ class MessengerSession {
       this.ensureConnected();
 
       if (this.currentConversationName !== conversationId) {
-        const snap = parseSnapshot(await browse(["snapshot", "--compact", "-s", SESSION], 20000));
-        const clickRef = this.findConversationRef(snap, conversationId);
-        if (clickRef) {
-          await browse(["click", `@${clickRef}`, "-s", SESSION]);
+        const originalName = this.conversationNameMap.get(conversationId) || conversationId;
+        try {
+          const page = await getCdpPage();
+          await page.locator(`a[role="link"]`).filter({ hasText: originalName }).first().click({ timeout: 5000 });
+          await page.waitForTimeout(2000);
+        } catch (err: any) {
+          console.error(`[Messenger] Playwright click failed in sendMessage: ${err.message}`);
         }
-        await browse(["wait", "timeout", "3000", "-s", SESSION]);
         this.currentConversationName = conversationId;
       }
 
-      // Find and click the textbox (format: [ref] textbox: Write to Name · Item)
+      // Find and click the textbox
       const snap = parseSnapshot(await browse(["snapshot", "--compact", "-s", SESSION], 15000));
       let textboxRef: string | null = null;
       for (const line of snap.split("\n")) {
@@ -327,6 +366,11 @@ class MessengerSession {
     try {
       await browse(["stop", "-s", SESSION]);
     } catch {}
+    if (cdpBrowser) {
+      try { await cdpBrowser.close(); } catch {}
+      cdpBrowser = null;
+      cdpPage = null;
+    }
     this._status = "disconnected";
     this._error = null;
     this.currentConversationName = null;
@@ -337,22 +381,33 @@ class MessengerSession {
     const originalName = this.conversationNameMap.get(conversationId);
     const slugParts = conversationId.split("-");
 
+    console.log(`[Messenger] findConversationRef: id="${conversationId}", originalName="${originalName}", slugParts=${JSON.stringify(slugParts)}`);
+
+    const linkLines = snapshot.split("\n").filter(l => l.includes("link:"));
+    console.log(`[Messenger] Found ${linkLines.length} link lines, Group chat links: ${linkLines.filter(l => l.includes("Group chat")).length}`);
+
     for (const line of snapshot.split("\n")) {
       if (!line.includes("link: Group chat:")) continue;
 
-      // Try exact original name match first
       if (originalName && line.includes(originalName)) {
         const rm = line.match(/\[(\d+-\d+)\]/);
-        if (rm) return rm[1];
+        if (rm) {
+          console.log(`[Messenger] Exact match found: ref=${rm[1]}`);
+          return rm[1];
+        }
       }
 
-      // Fallback: check if all slug parts appear in the line (case-insensitive)
       const lower = line.toLowerCase();
       if (slugParts.every(part => lower.includes(part))) {
         const rm = line.match(/\[(\d+-\d+)\]/);
-        if (rm) return rm[1];
+        if (rm) {
+          console.log(`[Messenger] Slug match found: ref=${rm[1]}`);
+          return rm[1];
+        }
       }
     }
+
+    console.log(`[Messenger] No match found for "${conversationId}"`);
     return null;
   }
 
