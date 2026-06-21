@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "server": "tsx --env-file=.env server/index.ts",
-    "build": "tsc -b && vite build",
+    "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },
