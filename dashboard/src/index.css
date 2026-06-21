@@ -149,6 +149,7 @@ body {
 }
 
 /* ── Colour variants per tab ── */
+.accent-overview  { background: var(--black); }
 .accent-upload    { background: var(--tab-upload); }
 .accent-pricing   { background: var(--tab-pricing); }
 .accent-listing   { background: var(--tab-listing); }

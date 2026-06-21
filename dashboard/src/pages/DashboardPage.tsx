@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import Overview from "../components/Overview";
 import PhotoUploader from "../components/PhotoUploader";
 import ItemsTable from "../components/ItemsTable";
 import PriceInfo from "../components/PriceInfo";
@@ -7,25 +8,26 @@ import ListingBuilder from "../components/ListingBuilder";
 import ActiveListings from "../components/ActiveListings";
 import MessengerChat from "../components/MessengerChat";
 
-type Tab = "upload" | "price-info" | "listing-builder" | "active-listings" | "messenger";
+type Tab = "overview" | "price-info" | "listing-builder" | "active-listings" | "messenger" | "upload";
 
 const TABS: { key: Tab; label: string; emoji: string; accent: string; sub: string }[] = [
-  { key: "upload",          label: "Upload",    emoji: "📷", accent: "accent-upload",    sub: "Add items & manage inventory" },
+  { key: "overview",        label: "Overview",  emoji: "📊", accent: "accent-overview",  sub: "Your reselling at a glance" },
   { key: "price-info",      label: "Pricing",   emoji: "🔍", accent: "accent-pricing",   sub: "Scout live market comps" },
   { key: "listing-builder", label: "Listing",   emoji: "🎬", accent: "accent-listing",   sub: "Build & publish listings" },
   { key: "active-listings", label: "Active",    emoji: "📦", accent: "accent-active",    sub: "Live listings across platforms" },
   { key: "messenger",       label: "Messenger", emoji: "💬", accent: "accent-messenger", sub: "Buyer DMs & negotiations" },
+  { key: "upload",          label: "Upload",    emoji: "📷", accent: "accent-upload",    sub: "Add items & manage inventory" },
 ];
 
 export default function DashboardPage() {
   const [refreshKey, setRefreshKey] = useState(0);
-  const [tab, setTab] = useState<Tab>("upload");
+  const [tab, setTab] = useState<Tab>("overview");
   const current = TABS.find((t) => t.key === tab)!;
 
   return (
     <div className="db-root">
 
-      {/* ── NAV: logo left · pill tabs centred · back right ── */}
+      {/* ── NAV ── */}
       <nav className="db-nav">
         <Link to="/" className="db-nav-logo">reseller.</Link>
 
@@ -46,10 +48,10 @@ export default function DashboardPage() {
         <Link to="/" className="db-nav-back">← Back</Link>
       </nav>
 
-      {/* ── MAIN CONTENT ── */}
+      {/* ── MAIN ── */}
       <main className="db-main">
 
-        {/* Section header — consistent across all tabs */}
+        {/* Section header */}
         <div className="db-section-header" style={{ marginBottom: "2rem" }}>
           <div className="db-section-title-group">
             <div className={`db-section-accent ${current.accent}`} />
@@ -60,15 +62,22 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Upload tab */}
+        {tab === "overview" && (
+          <Overview onNavigate={(t) => setTab(t as Tab)} />
+        )}
+
+        {tab === "price-info"      && <PriceInfo />}
+        {tab === "listing-builder" && <ListingBuilder />}
+        {tab === "active-listings" && <ActiveListings />}
+        {tab === "messenger"       && <MessengerChat />}
+
         {tab === "upload" && (
           <>
             <section style={{ marginBottom: "2.5rem" }}>
               <PhotoUploader onItemSaved={() => setRefreshKey((k) => k + 1)} />
             </section>
-
             <section>
-              <div className="db-section-header">
+              <div className="db-section-header" style={{ marginBottom: "1rem" }}>
                 <div className="db-section-title-group">
                   <div className="db-section-accent accent-upload" style={{ height: 20 }} />
                   <div className="db-section-title" style={{ fontSize: "1.125rem" }}>Inventory</div>
@@ -81,11 +90,6 @@ export default function DashboardPage() {
             </section>
           </>
         )}
-
-        {tab === "price-info"      && <PriceInfo />}
-        {tab === "listing-builder" && <ListingBuilder />}
-        {tab === "active-listings" && <ActiveListings />}
-        {tab === "messenger"       && <MessengerChat />}
 
       </main>
     </div>
