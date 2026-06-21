@@ -1,3 +1,8 @@
 {
-    "files.exclude": {}
+    "files.exclude": {
+        "dynamic-form-filling/.claude": true,
+        "dynamic-form-filling/node_modules": true,
+        ".claude": true,
+        ".vscode": true
+    }
 }

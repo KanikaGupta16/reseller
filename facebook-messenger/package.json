@@ -3,6 +3,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
+    "setup": "tsx setup.ts",
     "start": "tsx index.ts"
   },
   "dependencies": {
