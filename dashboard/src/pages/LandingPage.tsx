@@ -224,7 +224,7 @@ export default function LandingPage() {
             <h1 className="hero-h1">
               your pile is<br /><em>money</em><br />waiting. 💸
             </h1>
-            <p className="hero-sub">Scout prices it. Studio lists it. Closer sells it. Just upload a photo.</p>
+            <p className="hero-sub">Researcher prices it. Studio lists it. Closer sells it. Just upload a photo.</p>
             <div className="hero-ctas">
               <button className="pill pill-white pill-big" onClick={() => goTo(5)}>Let&apos;s start →</button>
               <button className="pill pill-big pill-ow" onClick={() => goTo(1)}>See how it works</button>
@@ -241,7 +241,7 @@ export default function LandingPage() {
         <div className={cls(1)} style={{ background: 'var(--blue)' }}>
           <div className="split">
             <div className="sl sl--blue">
-              <div className="step-lbl">01 / scout</div>
+              <div className="step-lbl">01 / researcher</div>
               <h2 className="sl-h2">priced before<br />you post. <em>🔍</em></h2>
               <p className="sl-p">Scout scans live Depop, eBay, and FB Marketplace in real time to find the price that sells fast — not the one that sits.</p>
               <div className="price-badge" style={{ marginTop: '1rem' }}>
@@ -437,19 +437,92 @@ export default function LandingPage() {
         <section className="agents-section" id="agents">
           <div className="section-label">how it works</div>
           <h2 className="big-head">snap it.<br /><em>it handles the rest.</em></h2>
-          <div className="agents-grid">
-            {[
-              { icon: '🔍', cls: 'c-blue', num: '01', name: 'scout',  desc: 'Takes your photo, uses AI vision to identify the item, then scrapes Depop, eBay, Facebook, Mercari, Poshmark and more to find what it actually sells for.', tags: ['GPT-4o Vision','Live Scraping','Price Range'] },
-              { icon: '🎬', cls: 'c-pink', num: '02', name: 'studio', desc: 'Writes the title, description and tags. Generates lifestyle photos with AI. Builds a complete listing ready to publish — no copywriting, no photography.', tags: ['AI Copywriting','Image Generation','Listing Builder'] },
-              { icon: '🤝', cls: 'c-yell', num: '03', name: 'closer', desc: 'Posts to Facebook Marketplace automatically. Monitors your Messenger inbox, reads buyer messages, and replies — so deals close while you do other things.', tags: ['FB Marketplace','Auto-Messaging','Negotiation'] },
-            ].map(a => (
-              <div key={a.name} className="agent-card">
-                <div className={`orbit-circle ${a.cls}`}>{a.icon}<div className="ring" /></div>
-                <div><div className="agent-num">Agent {a.num}</div><div className="agent-name">{a.name}</div></div>
-                <p className="agent-p">{a.desc}</p>
-                <div className="chip-row">{a.tags.map(t => <span key={t} className="chip">{t}</span>)}</div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
+
+            {/* ── Step 0: Upload ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.625rem', flexShrink: 0 }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%',
+                background: 'var(--gray)', border: '2px dashed rgba(0,0,0,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.625rem'
+              }}>📷</div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)' }}>You</div>
+                <div style={{ fontWeight: 900, fontSize: '0.875rem', letterSpacing: '-0.02em', textTransform: 'lowercase' }}>upload</div>
               </div>
-            ))}
+            </div>
+
+            {/* Arrow 1 */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flexShrink: 0, opacity: 0.4 }}>
+              <svg width="48" height="20" viewBox="0 0 48 20" fill="none">
+                <path d="M2 10 C14 3 34 3 42 10" stroke="#080808" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M37 5 L42 10 L37 15" stroke="#080808" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* ── Agent 01: Researcher ── */}
+            <div className="agent-card" style={{ flexShrink: 0, minWidth: 200 }}>
+              <div className="orbit-circle c-blue" style={{ width: 100, height: 100, fontSize: '2.25rem' }}>🔍<div className="ring" /></div>
+              <div><div className="agent-num">Agent 01</div><div className="agent-name">researcher</div></div>
+              <p className="agent-p" style={{ fontSize: '0.78rem' }}>Uses GPT-4o vision to identify your item, then scrapes Depop, eBay, Facebook, Mercari & more to find the real selling price.</p>
+              <div className="chip-row"><span className="chip">GPT-4o Vision</span><span className="chip">Live Scraping</span><span className="chip">Price Range</span></div>
+            </div>
+
+            {/* Arrow 2 */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flexShrink: 0, opacity: 0.4 }}>
+              <svg width="48" height="20" viewBox="0 0 48 20" fill="none">
+                <path d="M2 10 C14 3 34 3 42 10" stroke="#080808" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M37 5 L42 10 L37 15" stroke="#080808" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* ── Agent 02: Studio ── */}
+            <div className="agent-card" style={{ flexShrink: 0, minWidth: 200 }}>
+              <div className="orbit-circle c-pink" style={{ width: 100, height: 100, fontSize: '2.25rem' }}>🎬<div className="ring" /></div>
+              <div><div className="agent-num">Agent 02</div><div className="agent-name">studio</div></div>
+              <p className="agent-p" style={{ fontSize: '0.78rem' }}>Writes the title, description and tags. Generates AI lifestyle photos. Builds a complete listing — no copywriting, no photography needed.</p>
+              <div className="chip-row"><span className="chip">AI Copywriting</span><span className="chip">Image Gen</span><span className="chip">Listing Builder</span></div>
+            </div>
+
+            {/* Arrow 3 */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flexShrink: 0, opacity: 0.4 }}>
+              <svg width="48" height="20" viewBox="0 0 48 20" fill="none">
+                <path d="M2 10 C14 3 34 3 42 10" stroke="#080808" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M37 5 L42 10 L37 15" stroke="#080808" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* ── Agent 03: Closer ── */}
+            <div className="agent-card" style={{ flexShrink: 0, minWidth: 200 }}>
+              <div className="orbit-circle c-yell" style={{ width: 100, height: 100, fontSize: '2.25rem' }}>🤝<div className="ring" /></div>
+              <div><div className="agent-num">Agent 03</div><div className="agent-name">closer</div></div>
+              <p className="agent-p" style={{ fontSize: '0.78rem' }}>Posts to Facebook Marketplace. Monitors your Messenger inbox, reads offers, and replies — so deals close while you do other things.</p>
+              <div className="chip-row"><span className="chip">FB Marketplace</span><span className="chip">Auto-Messaging</span><span className="chip">Negotiation</span></div>
+            </div>
+
+            {/* Arrow 4 */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem', flexShrink: 0, opacity: 0.4 }}>
+              <svg width="48" height="20" viewBox="0 0 48 20" fill="none">
+                <path d="M2 10 C14 3 34 3 42 10" stroke="#080808" strokeWidth="1.8" strokeLinecap="round"/>
+                <path d="M37 5 L42 10 L37 15" stroke="#080808" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
+
+            {/* ── Step End: Negotiate & Finalise ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.625rem', flexShrink: 0 }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%',
+                background: 'var(--yellow)', border: '2px solid rgba(0,0,0,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.625rem'
+              }}>💰</div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--muted)' }}>Auto</div>
+                <div style={{ fontWeight: 900, fontSize: '0.875rem', letterSpacing: '-0.02em', textTransform: 'lowercase' }}>negotiate</div>
+                <div style={{ fontWeight: 900, fontSize: '0.875rem', letterSpacing: '-0.02em', textTransform: 'lowercase', lineHeight: 1 }}>&amp; finalise</div>
+              </div>
+            </div>
+
           </div>
         </section>
 
