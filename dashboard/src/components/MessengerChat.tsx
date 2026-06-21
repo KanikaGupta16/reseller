@@ -23,10 +23,22 @@ interface AgentLog {
   timestamp: number;
 }
 
-const API = "http://localhost:3001/api/messenger";
-const AGENT_API = "http://localhost:3001/api/buyer-agent";
+const BE = import.meta.env.VITE_API_URL || "";
+const API = `${BE}/api/messenger`;
+const AGENT_API = `${BE}/api/buyer-agent`;
 
 export default function MessengerChat() {
+  if (!BE) return (
+    <div className="empty" style={{ minHeight: 400 }}>
+      <span className="empty-icon">💬</span>
+      <span style={{ fontWeight: 900, fontSize: "1.25rem", letterSpacing: "-0.02em" }}>Backend not connected</span>
+      <span style={{ color: "var(--muted)", maxWidth: 360, textAlign: "center", lineHeight: 1.6 }}>
+        Messenger requires the agent backend running locally.<br />
+        Run <code style={{ background: "var(--gray)", padding: "2px 6px", borderRadius: 4, fontSize: "0.8rem" }}>npm run server</code> inside <code style={{ background: "var(--gray)", padding: "2px 6px", borderRadius: 4, fontSize: "0.8rem" }}>dashboard/</code> and set <code style={{ background: "var(--gray)", padding: "2px 6px", borderRadius: 4, fontSize: "0.8rem" }}>VITE_API_URL</code>.
+      </span>
+    </div>
+  );
+
   const [status, setStatus] = useState<"disconnected" | "connecting" | "connected" | "error">("disconnected");
   const [error, setError] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);

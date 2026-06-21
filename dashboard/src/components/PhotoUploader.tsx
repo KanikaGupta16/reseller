@@ -63,8 +63,11 @@ export default function PhotoUploader({ onItemSaved }: Props) {
       setSaved((s) => ({ ...s, [index]: true }));
       onItemSaved();
       if (inserted?.id) {
-        fetch(`${API}/api/research`,      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId: inserted.id }) }).catch(() => {});
-        fetch(`${API}/api/media/generate`,{ method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId: inserted.id }) }).catch(() => {});
+        // Only trigger backend jobs if API is configured
+        if (API) {
+          fetch(`${API}/api/research`,       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId: inserted.id }) }).catch(() => {});
+          fetch(`${API}/api/media/generate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId: inserted.id }) }).catch(() => {});
+        }
       }
     }
   };

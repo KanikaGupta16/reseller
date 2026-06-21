@@ -183,57 +183,55 @@ export default function LandingPage() {
       if (!newItemId) throw new Error('DB insert failed')
       setItemId(newItemId)
 
-      // 3. Trigger Scout (research) + Studio (media)
-      await Promise.all([
-        fetch(`${API}/api/research`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: newItemId }) }).catch(() => {}),
-        fetch(`${API}/api/media/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: newItemId }) }).catch(() => {}),
-      ])
+      if (API) {
+        // 3. Trigger Scout + Studio
+        await Promise.all([
+          fetch(`${API}/api/research`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: newItemId }) }).catch(() => {}),
+          fetch(`${API}/api/media/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: newItemId }) }).catch(() => {}),
+        ])
 
-      // 4. Poll Scout progress
-      let scoutDone = false
-      for (let i = 0; i < 30 && !scoutDone; i++) {
-        await new Promise(r => setTimeout(r, 3000))
-        try {
-          const r = await fetch(`${API}/api/research/item/${newItemId}`)
-          const d = await r.json()
-          if (d?.status === 'complete' || d?.status === 'done') {
-            scoutDone = true
-            setRealItem({
-              title: d.title || item.title,
-              tags: d.tags || item.tags,
-              price: d.result?.suggested_price,
-            })
-          }
-        } catch {}
-      }
-      setScout('done'); setStudio('working')
+        // 4. Poll Scout
+        let scoutDone = false
+        for (let i = 0; i < 30 && !scoutDone; i++) {
+          await new Promise(r => setTimeout(r, 3000))
+          try {
+            const r = await fetch(`${API}/api/research/item/${newItemId}`)
+            const d = await r.json()
+            if (d?.status === 'complete' || d?.status === 'done') {
+              scoutDone = true
+              setRealItem({ title: d.title || item.title, tags: d.tags || item.tags, price: d.result?.suggested_price })
+            }
+          } catch {}
+        }
+        setScout('done'); setStudio('working')
 
-      // 5. Poll Studio (media)
-      let studioDone = false
-      for (let i = 0; i < 20 && !studioDone; i++) {
-        await new Promise(r => setTimeout(r, 3000))
-        try {
-          const r = await fetch(`${API}/api/media/status/${newItemId}`)
-          const d = await r.json()
-          if (d?.status === 'done' && d?.count > 0) studioDone = true
-        } catch {}
-      }
-      setStudio('done'); setCloser('working')
+        // 5. Poll Studio
+        let studioDone = false
+        for (let i = 0; i < 20 && !studioDone; i++) {
+          await new Promise(r => setTimeout(r, 3000))
+          try {
+            const r = await fetch(`${API}/api/media/status/${newItemId}`)
+            const d = await r.json()
+            if (d?.status === 'done' && d?.count > 0) studioDone = true
+          } catch {}
+        }
+        setStudio('done'); setCloser('working')
 
-      // 6. Trigger Pika video generation
-      fetch(`${API}/api/video/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: newItemId }) }).catch(() => {})
-
-      // 7. Poll video
-      for (let i = 0; i < 36; i++) {
-        await new Promise(r => setTimeout(r, 5000))
-        try {
-          const r = await fetch(`${API}/api/video/status/${newItemId}`)
-          const d = await r.json()
-          if (d?.status === 'done' && d?.videoUrl) {
-            setVideoUrl(d.videoUrl)
-            break
-          }
-        } catch {}
+        // 6. Pika video
+        fetch(`${API}/api/video/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: newItemId }) }).catch(() => {})
+        for (let i = 0; i < 36; i++) {
+          await new Promise(r => setTimeout(r, 5000))
+          try {
+            const r = await fetch(`${API}/api/video/status/${newItemId}`)
+            const d = await r.json()
+            if (d?.status === 'done' && d?.videoUrl) { setVideoUrl(d.videoUrl); break }
+          } catch {}
+        }
+      } else {
+        // No backend — run timed mock flow
+        await new Promise(r => setTimeout(r, 2000)); setScout('done'); setStudio('working')
+        await new Promise(r => setTimeout(r, 2000)); setStudio('done'); setCloser('working')
+        await new Promise(r => setTimeout(r, 1500))
       }
       setCloser('done'); setUploadStep('done')
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { hasBackend, apiFetch } from "../lib/api";
 
 interface Item {
   id: string;
@@ -107,88 +108,54 @@ export default function ListingBuilder() {
 
   const saveListing = async () => {
     if (!selectedId) return;
-    setSaving(true);
-    setSaveStatus("idle");
+    setSaving(true); setSaveStatus("idle");
     try {
-      const res = await fetch("http://localhost:3001/api/listing/build", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          itemId: selectedId,
-          title: form.title,
-          price: Number(form.price),
-          min_negotiation_price: form.min_negotiation_price ?? Math.round(form.price * 0.8),
-          category: form.category,
-          condition: form.condition,
-          location: form.location,
-          description: form.description,
-          meetup_preferences: form.meetup_preferences,
-        }),
-      });
-      if (res.ok) {
-        setSaveStatus("saved");
-        loadItems();
-      } else {
-        setSaveStatus("error");
-      }
-    } catch {
-      setSaveStatus("error");
-    }
+      // Save directly to Supabase — no backend needed
+      const { error } = await supabase.from("items").update({
+        title: form.title,
+        listing_price: Number(form.price),
+        category: form.category,
+        condition: form.condition,
+        location: form.location,
+        description: form.description,
+        meetup_preferences: form.meetup_preferences,
+      }).eq("id", selectedId);
+      if (error) throw error;
+      setSaveStatus("saved");
+      loadItems();
+    } catch { setSaveStatus("error"); }
     setSaving(false);
   };
 
   const publishToFacebook = async () => {
+    if (!hasBackend) { setPublishResult({ success: false, message: "Backend not connected — run the server locally to publish." }); return; }
     if (!selectedId) return;
     await saveListing();
-    setPublishing(true);
-    setPublishStep("starting");
-    setPublishResult(null);
-
+    setPublishing(true); setPublishStep("starting"); setPublishResult(null);
     try {
-      await fetch("http://localhost:3001/api/publish/facebook", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: selectedId }),
-      });
-
+      await apiFetch("/api/publish/facebook", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId: selectedId }) });
       const poll = setInterval(async () => {
         try {
-          const res = await fetch(`http://localhost:3001/api/publish/facebook/${selectedId}`);
+          const res = await apiFetch(`/api/publish/facebook/${selectedId}`);
           const data = await res.json();
           setPublishStep(data.step || "");
-          if (data.status === "done" || data.status === "failed") {
-            clearInterval(poll);
-            setPublishing(false);
-            setPublishResult(data.result);
-          }
-        } catch {}
+          if (data.status === "done" || data.status === "failed") { clearInterval(poll); setPublishing(false); setPublishResult(data.result); }
+        } catch { clearInterval(poll); setPublishing(false); }
       }, 3000);
-    } catch {
-      setPublishing(false);
-      setPublishResult({ success: false, message: "Failed to start publish" });
-    }
+    } catch { setPublishing(false); setPublishResult({ success: false, message: "Failed to start publish" }); }
   };
 
   const generateVideoClip = async () => {
+    if (!hasBackend) { alert("Backend not connected — run the server locally to generate videos."); return; }
     if (!selectedId) return;
     setVideoLoading(true);
     try {
-      await fetch("http://localhost:3001/api/video/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId: selectedId }),
-      });
-      // Poll until done
+      await apiFetch("/api/video/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itemId: selectedId }) });
       const poll = setInterval(async () => {
         try {
-          const r = await fetch(`http://localhost:3001/api/video/status/${selectedId}`);
+          const r = await apiFetch(`/api/video/status/${selectedId}`);
           const d = await r.json();
-          if (d.status === "done") {
-            clearInterval(poll);
-            setVideoUrl(d.videoUrl);
-            setVideoIsPika(d.isPika);
-            setVideoLoading(false);
-          }
+          if (d.status === "done") { clearInterval(poll); setVideoUrl(d.videoUrl); setVideoIsPika(d.isPika); setVideoLoading(false); }
         } catch { clearInterval(poll); setVideoLoading(false); }
       }, 4000);
     } catch { setVideoLoading(false); }
