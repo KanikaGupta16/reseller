@@ -27,9 +27,7 @@ const API = "http://localhost:3001/api/messenger";
 const AGENT_API = "http://localhost:3001/api/buyer-agent";
 
 export default function MessengerChat() {
-  const [status, setStatus] = useState<
-    "disconnected" | "connecting" | "connected" | "error"
-  >("disconnected");
+  const [status, setStatus] = useState<"disconnected" | "connecting" | "connected" | "error">("disconnected");
   const [error, setError] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConv, setSelectedConv] = useState<string | null>(null);
@@ -46,10 +44,7 @@ export default function MessengerChat() {
   useEffect(() => {
     fetch(`${API}/status`)
       .then((r) => r.json())
-      .then((data) => {
-        setStatus(data.status);
-        setError(data.error);
-      })
+      .then((data) => { setStatus(data.status); setError(data.error); })
       .catch(() => {});
   }, []);
 
@@ -87,9 +82,7 @@ export default function MessengerChat() {
     if (!selectedConv || status !== "connected") return;
     const fetchMsgs = async () => {
       try {
-        const res = await fetch(
-          `${API}/conversations/${selectedConv}/messages`
-        );
+        const res = await fetch(`${API}/conversations/${selectedConv}/messages`);
         const data = await res.json();
         setMessages(data.messages || []);
         if (data.conversationName) setSelectedName(data.conversationName);
@@ -107,27 +100,20 @@ export default function MessengerChat() {
   }, [messages]);
 
   const handleConnect = async () => {
-    setStatus("connecting");
-    setError(null);
+    setStatus("connecting"); setError(null);
     try {
       const res = await fetch(`${API}/connect`, { method: "POST" });
       const data = await res.json();
       setStatus(data.status);
       if (data.error) setError(data.error);
     } catch (err: any) {
-      setStatus("error");
-      setError(err.message);
+      setStatus("error"); setError(err.message);
     }
   };
 
   const handleDisconnect = async () => {
-    try {
-      await fetch(`${API}/disconnect`, { method: "POST" });
-    } catch {}
-    setStatus("disconnected");
-    setConversations([]);
-    setMessages([]);
-    setSelectedConv(null);
+    try { await fetch(`${API}/disconnect`, { method: "POST" }); } catch {}
+    setStatus("disconnected"); setConversations([]); setMessages([]); setSelectedConv(null);
   };
 
   const handleAgentToggle = async () => {
@@ -151,9 +137,7 @@ export default function MessengerChat() {
         body: JSON.stringify({ text: inputText }),
       });
       setInputText("");
-      const res = await fetch(
-        `${API}/conversations/${selectedConv}/messages`
-      );
+      const res = await fetch(`${API}/conversations/${selectedConv}/messages`);
       const data = await res.json();
       setMessages(data.messages || []);
     } catch (err: any) {
@@ -162,75 +146,23 @@ export default function MessengerChat() {
     setSending(false);
   };
 
-  const statusColor =
-    status === "connected"
-      ? "#4ecdc4"
-      : status === "connecting"
-        ? "#f0c040"
-        : status === "error"
-          ? "#e74c3c"
-          : "#666";
+  const statusColor = status === "connected" ? "#16a34a" : status === "connecting" ? "#ca8a04" : status === "error" ? "#ef4444" : "#888";
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          padding: "12px 16px",
-          background: "#12121e",
-          borderRadius: 8,
-          marginBottom: 16,
-        }}
-      >
-        <div
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: "50%",
-            background: statusColor,
-            flexShrink: 0,
-          }}
-        />
-        <span style={{ color: "#ccc", fontSize: 14, flex: 1 }}>
-          {status === "connected"
-            ? "Connected to Messenger"
-            : status === "connecting"
-              ? "Connecting to Messenger..."
-              : status === "error"
-                ? `Error: ${error}`
-                : "Disconnected"}
+      {/* Connection bar */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
+        background: "#F8F8F8", borderRadius: 10, marginBottom: 16, border: "1.5px solid rgba(0,0,0,0.08)",
+      }}>
+        <div style={{ width: 10, height: 10, borderRadius: "50%", background: statusColor, flexShrink: 0 }} />
+        <span style={{ color: "#333", fontSize: 14, flex: 1 }}>
+          {status === "connected" ? "Connected to Messenger" : status === "connecting" ? "Connecting to Messenger..." : status === "error" ? `Error: ${error}` : "Disconnected"}
         </span>
         {status === "connected" ? (
-          <button
-            onClick={handleDisconnect}
-            style={{
-              padding: "6px 16px",
-              background: "#333",
-              color: "#ccc",
-              border: "1px solid #444",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontSize: 13,
-            }}
-          >
-            Disconnect
-          </button>
+          <button onClick={handleDisconnect} className="btn btn-secondary" style={{ fontSize: 13 }}>Disconnect</button>
         ) : (
-          <button
-            onClick={handleConnect}
-            disabled={status === "connecting"}
-            style={{
-              padding: "6px 16px",
-              background: status === "connecting" ? "#333" : "#4f46e5",
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              cursor: status === "connecting" ? "wait" : "pointer",
-              fontSize: 13,
-            }}
-          >
+          <button onClick={handleConnect} disabled={status === "connecting"} className="btn btn-primary" style={{ fontSize: 13 }}>
             {status === "connecting" ? "Connecting..." : "Connect"}
           </button>
         )}
@@ -238,59 +170,35 @@ export default function MessengerChat() {
 
       {/* Buyer Agent Bar */}
       {status === "connected" && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            padding: "10px 16px",
-            background: agentRunning ? "#0f2a1f" : "#12121e",
-            borderRadius: 8,
-            marginBottom: 16,
-            border: agentRunning ? "1px solid #166534" : "1px solid #2a2a3a",
-          }}
-        >
-          <div
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "50%",
-              background: agentRunning ? "#4ade80" : "#555",
-              boxShadow: agentRunning ? "0 0 6px #4ade80" : "none",
-              flexShrink: 0,
-            }}
-          />
-          <span style={{ color: "#ccc", fontSize: 13, flex: 1 }}>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
+          background: agentRunning ? "#f0fdf4" : "#F8F8F8",
+          borderRadius: 10, marginBottom: 16,
+          border: agentRunning ? "1.5px solid #bbf7d0" : "1.5px solid rgba(0,0,0,0.08)",
+        }}>
+          <div style={{
+            width: 8, height: 8, borderRadius: "50%",
+            background: agentRunning ? "#22c55e" : "#ccc",
+            boxShadow: agentRunning ? "0 0 6px #22c55e" : "none",
+            flexShrink: 0,
+          }} />
+          <span style={{ color: "#333", fontSize: 13, flex: 1 }}>
             <strong>Buyer Reply Agent</strong>
             <span style={{ color: "#888", marginLeft: 8 }}>
-              {agentRunning
-                ? `Auto-replying to questions (${agentLog.length} replies sent)`
-                : "Off"}
+              {agentRunning ? `Auto-replying to questions (${agentLog.length} replies sent)` : "Off"}
             </span>
           </span>
-          <button
-            onClick={handleAgentToggle}
-            style={{
-              padding: "5px 14px",
-              background: agentRunning ? "#991b1b" : "#166534",
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
+          <button onClick={handleAgentToggle} className={`btn ${agentRunning ? "btn-danger" : "btn-success"}`} style={{ fontSize: 12 }}>
             {agentRunning ? "Stop Agent" : "Start Agent"}
           </button>
         </div>
       )}
 
       {status !== "connected" && (
-        <div style={{ color: "#666", textAlign: "center", marginTop: 60 }}>
+        <div style={{ color: "#888", textAlign: "center", marginTop: 60 }}>
           <p>Connect to your Marketplace inbox to view and respond to buyer messages.</p>
-          <p style={{ fontSize: 12, marginTop: 8, color: "#555" }}>
-            Launch Chrome with: <code style={{ background: "#1a1a2e", padding: "2px 6px", borderRadius: 4, color: "#4ecdc4" }}>
+          <p style={{ fontSize: 12, marginTop: 8, color: "#aaa" }}>
+            Launch Chrome with: <code style={{ background: "#F8F8F8", padding: "2px 6px", borderRadius: 4, color: "#E875BB", border: "1px solid rgba(0,0,0,0.08)" }}>
               chrome --remote-debugging-port=9222
             </code> then click Connect.
           </p>
@@ -298,108 +206,47 @@ export default function MessengerChat() {
       )}
 
       {status === "connected" && (
-        <div style={{ display: "flex", gap: 0, height: "calc(100vh - 240px)" }}>
+        <div style={{ display: "flex", gap: 0, height: "calc(100vh - 280px)", border: "1.5px solid rgba(0,0,0,0.08)", borderRadius: 14, overflow: "hidden" }}>
           {/* Conversation List */}
-          <div
-            style={{
-              width: 300,
-              borderRight: "1px solid #2a2a3a",
-              overflowY: "auto",
-              flexShrink: 0,
-            }}
-          >
+          <div style={{ width: 300, borderRight: "1.5px solid rgba(0,0,0,0.08)", overflowY: "auto", flexShrink: 0 }}>
             {loadingConvs && conversations.length === 0 && (
-              <p style={{ color: "#888", padding: 16, fontSize: 13 }}>
-                Loading conversations...
-              </p>
+              <p style={{ color: "#888", padding: 16, fontSize: 13 }}>Loading conversations...</p>
             )}
             {conversations.map((conv) => (
               <div
                 key={conv.id}
-                onClick={() => {
-                  setSelectedConv(conv.id);
-                  setSelectedName(conv.name);
-                  setMessages([]);
-                }}
+                onClick={() => { setSelectedConv(conv.id); setSelectedName(conv.name); setMessages([]); }}
                 style={{
-                  padding: "12px 16px",
-                  cursor: "pointer",
-                  borderLeft:
-                    selectedConv === conv.id
-                      ? "3px solid #4f46e5"
-                      : "3px solid transparent",
-                  background:
-                    selectedConv === conv.id ? "#1a1a2e" : "transparent",
+                  padding: "12px 16px", cursor: "pointer",
+                  borderLeft: selectedConv === conv.id ? "3px solid #080808" : "3px solid transparent",
+                  background: selectedConv === conv.id ? "#F8F8F8" : "transparent",
                   transition: "all 0.1s",
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 4,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontWeight: conv.unread ? 700 : 400,
-                      color: conv.unread ? "#e0e0e0" : "#aaa",
-                      fontSize: 14,
-                    }}
-                  >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                  <span style={{ fontWeight: conv.unread ? 800 : 400, color: conv.unread ? "#080808" : "#555", fontSize: 14 }}>
                     {conv.name}
                   </span>
-                  <span style={{ color: "#666", fontSize: 11 }}>
-                    {conv.timestamp}
-                  </span>
+                  <span style={{ color: "#aaa", fontSize: 11 }}>{conv.timestamp}</span>
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  {conv.unread && (
-                    <div
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: "50%",
-                        background: "#4f46e5",
-                        flexShrink: 0,
-                      }}
-                    />
-                  )}
-                  <span
-                    style={{
-                      color: "#666",
-                      fontSize: 12,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {conv.unread && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#E875BB", flexShrink: 0 }} />}
+                  <span style={{ color: "#888", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {conv.lastMessage}
                   </span>
                 </div>
               </div>
             ))}
-            {/* Agent Activity Log */}
+
             {agentRunning && agentLog.length > 0 && (
-              <div style={{ borderTop: "1px solid #2a2a3a", padding: "12px 16px" }}>
-                <div style={{ fontSize: 11, color: "#4ade80", fontWeight: 600, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>
+              <div style={{ borderTop: "1.5px solid rgba(0,0,0,0.08)", padding: "12px 16px" }}>
+                <div style={{ fontSize: 11, color: "#16a34a", fontWeight: 800, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>
                   Agent Activity
                 </div>
                 {agentLog.slice(-5).reverse().map((entry, i) => (
                   <div key={i} style={{ marginBottom: 8, fontSize: 12 }}>
-                    <div style={{ color: "#888" }}>
-                      Q: <span style={{ color: "#aaa" }}>{entry.question}</span>
-                    </div>
-                    <div style={{ color: "#4ade80" }}>
-                      A: {entry.reply}
-                    </div>
+                    <div style={{ color: "#888" }}>Q: <span style={{ color: "#555" }}>{entry.question}</span></div>
+                    <div style={{ color: "#16a34a" }}>A: {entry.reply}</div>
                   </div>
                 ))}
               </div>
@@ -407,101 +254,36 @@ export default function MessengerChat() {
           </div>
 
           {/* Message Thread */}
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              minWidth: 0,
-            }}
-          >
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
             {!selectedConv ? (
-              <div
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#666",
-                }}
-              >
+              <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "#888" }}>
                 Select a conversation
               </div>
             ) : (
               <>
-                {/* Header */}
-                <div
-                  style={{
-                    padding: "12px 20px",
-                    borderBottom: "1px solid #2a2a3a",
-                    fontWeight: 600,
-                    fontSize: 16,
-                    color: "#e0e0e0",
-                  }}
-                >
+                <div style={{ padding: "12px 20px", borderBottom: "1.5px solid rgba(0,0,0,0.08)", fontWeight: 800, fontSize: 16, color: "#080808" }}>
                   {selectedName}
                 </div>
 
-                {/* Messages */}
-                <div
-                  style={{
-                    flex: 1,
-                    overflowY: "auto",
-                    padding: "16px 20px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                  }}
-                >
-                  {loadingMsgs && messages.length === 0 && (
-                    <p style={{ color: "#888", fontSize: 13 }}>
-                      Loading messages...
-                    </p>
-                  )}
+                <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {loadingMsgs && messages.length === 0 && <p style={{ color: "#888", fontSize: 13 }}>Loading messages...</p>}
                   {messages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      style={{
-                        alignSelf: msg.isMe ? "flex-end" : "flex-start",
-                        maxWidth: "70%",
-                      }}
-                    >
-                      {!msg.isMe && (
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "#888",
-                            marginBottom: 2,
-                            paddingLeft: 12,
-                          }}
-                        >
-                          {msg.sender}
-                        </div>
-                      )}
-                      <div
-                        style={{
-                          padding: "8px 14px",
-                          borderRadius: 18,
-                          background: msg.isMe ? "#4f46e5" : "#1a1a2e",
-                          color: msg.isMe ? "#fff" : "#e0e0e0",
-                          fontSize: 14,
-                          lineHeight: 1.4,
-                          wordBreak: "break-word",
-                        }}
-                      >
+                    <div key={msg.id} style={{ alignSelf: msg.isMe ? "flex-end" : "flex-start", maxWidth: "70%" }}>
+                      {!msg.isMe && <div style={{ fontSize: 11, color: "#888", marginBottom: 2, paddingLeft: 12 }}>{msg.sender}</div>}
+                      <div style={{
+                        padding: "8px 14px", borderRadius: 18,
+                        background: msg.isMe ? "#080808" : "#F8F8F8",
+                        color: msg.isMe ? "#fff" : "#080808",
+                        fontSize: 14, lineHeight: 1.4, wordBreak: "break-word",
+                      }}>
                         {msg.text}
                       </div>
                       {msg.timestamp && (
-                        <div
-                          style={{
-                            fontSize: 10,
-                            color: "#555",
-                            marginTop: 2,
-                            textAlign: msg.isMe ? "right" : "left",
-                            paddingLeft: msg.isMe ? 0 : 12,
-                            paddingRight: msg.isMe ? 12 : 0,
-                          }}
-                        >
+                        <div style={{
+                          fontSize: 10, color: "#aaa", marginTop: 2,
+                          textAlign: msg.isMe ? "right" : "left",
+                          paddingLeft: msg.isMe ? 0 : 12, paddingRight: msg.isMe ? 12 : 0,
+                        }}>
                           {msg.timestamp}
                         </div>
                       )}
@@ -510,56 +292,27 @@ export default function MessengerChat() {
                   <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input */}
-                <div
-                  style={{
-                    padding: "12px 20px",
-                    borderTop: "1px solid #2a2a3a",
-                    display: "flex",
-                    gap: 8,
-                  }}
-                >
+                <div style={{ padding: "12px 20px", borderTop: "1.5px solid rgba(0,0,0,0.08)", display: "flex", gap: 8 }}>
                   <input
                     type="text"
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSend();
-                      }
-                    }}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                     placeholder="Type a message..."
                     disabled={sending}
                     style={{
-                      flex: 1,
-                      padding: "10px 16px",
-                      background: "#12121e",
-                      border: "1px solid #2a2a3a",
-                      borderRadius: 20,
-                      color: "#e0e0e0",
-                      fontSize: 14,
-                      outline: "none",
+                      flex: 1, padding: "10px 16px", background: "#F8F8F8",
+                      border: "1.5px solid rgba(0,0,0,0.08)", borderRadius: 100,
+                      color: "#080808", fontSize: 14, outline: "none", fontFamily: "inherit",
                     }}
                   />
                   <button
                     onClick={handleSend}
                     disabled={sending || !inputText.trim()}
-                    style={{
-                      padding: "8px 20px",
-                      background:
-                        sending || !inputText.trim() ? "#333" : "#4f46e5",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 20,
-                      cursor:
-                        sending || !inputText.trim()
-                          ? "not-allowed"
-                          : "pointer",
-                      fontSize: 14,
-                    }}
+                    className="btn btn-primary"
+                    style={{ borderRadius: 100, padding: "8px 20px", fontSize: 14 }}
                   >
-                    {sending ? "Sending..." : "Send"}
+                    {sending ? "..." : "Send"}
                   </button>
                 </div>
               </>

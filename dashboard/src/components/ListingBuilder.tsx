@@ -133,7 +133,6 @@ export default function ListingBuilder() {
 
   const publishToFacebook = async () => {
     if (!selectedId) return;
-    // Save first, then publish
     await saveListing();
     setPublishing(true);
     setPublishStep("starting");
@@ -146,7 +145,6 @@ export default function ListingBuilder() {
         body: JSON.stringify({ itemId: selectedId }),
       });
 
-      // Poll for status
       const poll = setInterval(async () => {
         try {
           const res = await fetch(`http://localhost:3001/api/publish/facebook/${selectedId}`);
@@ -176,9 +174,9 @@ export default function ListingBuilder() {
               key={item.id}
               className="card"
               onClick={() => selectItem(item)}
-              style={{ cursor: "pointer", transition: "border-color 0.15s" }}
-              onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#4f46e5")}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#2a2a3a")}
+              style={{ cursor: "pointer", transition: "border-color 0.15s, box-shadow 0.15s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#E875BB"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(0,0,0,0.08)"; }}
             >
               {item.image_url && (
                 <img src={item.image_url} alt="" style={{ width: "100%", height: 140, objectFit: "cover", borderRadius: 8, marginBottom: 8 }} />
@@ -187,12 +185,12 @@ export default function ListingBuilder() {
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
                 {item.category && <span className="tag">{item.category}</span>}
                 {(item.media_urls && item.media_urls.length > 0) && (
-                  <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#1a3a2a", color: "#4ecdc4" }}>
+                  <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 100, background: "#f0fdf4", color: "#16a34a", fontWeight: 600 }}>
                     {item.media_urls.length} photos
                   </span>
                 )}
                 {item.listing_price && (
-                  <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#1e1e30", color: "#8888cc" }}>
+                  <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 100, background: "#FFF0F7", color: "#E875BB", fontWeight: 700 }}>
                     ${item.listing_price}
                   </span>
                 )}
@@ -200,7 +198,7 @@ export default function ListingBuilder() {
             </div>
           ))}
         </div>
-        {items.length === 0 && <p style={{ color: "#666" }}>No items yet. Upload products first.</p>}
+        {items.length === 0 && <p style={{ color: "#888" }}>No items yet. Upload products first.</p>}
       </div>
     );
   }
@@ -208,16 +206,15 @@ export default function ListingBuilder() {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-        <button onClick={() => { setSelectedId(null); loadItems(); }} className="btn" style={{ background: "#222", color: "#aaa" }}>
+        <button onClick={() => { setSelectedId(null); loadItems(); }} className="btn btn-secondary">
           ← Back
         </button>
         <h2 style={{ fontSize: 20, margin: 0 }}>Build Listing</h2>
-        {saveStatus === "saved" && <span style={{ color: "#4ecdc4", fontSize: 14 }}>Saved</span>}
-        {saveStatus === "error" && <span style={{ color: "#ff6b6b", fontSize: 14 }}>Save failed</span>}
+        {saveStatus === "saved" && <span style={{ color: "#16a34a", fontSize: 14, fontWeight: 700 }}>Saved</span>}
+        {saveStatus === "error" && <span style={{ color: "#ef4444", fontSize: 14, fontWeight: 700 }}>Save failed</span>}
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-        {/* Left column: Form */}
         <div>
           <div className="card" style={{ marginBottom: 16 }}>
             <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>Listing Details</h3>
@@ -238,16 +235,12 @@ export default function ListingBuilder() {
                 onChange={(e) => updateField("min_negotiation_price", parseFloat(e.target.value) || 0)}
               />
               {form.min_negotiation_price !== null && (
-                <button
-                  onClick={() => updateField("min_negotiation_price", null)}
-                  className="btn"
-                  style={{ background: "#222", color: "#888", fontSize: 11, padding: "6px 10px", whiteSpace: "nowrap" }}
-                >
+                <button onClick={() => updateField("min_negotiation_price", null)} className="btn btn-secondary" style={{ fontSize: 11, padding: "6px 10px", whiteSpace: "nowrap" }}>
                   Reset
                 </button>
               )}
             </div>
-            <span style={{ fontSize: 11, color: "#666", marginTop: 2, display: "block" }}>
+            <span style={{ fontSize: 11, color: "#888", marginTop: 2, display: "block" }}>
               {form.min_negotiation_price === null ? "Auto: 80% of listing price" : "Custom override"}
             </span>
 
@@ -272,7 +265,7 @@ export default function ListingBuilder() {
             <label style={labelStyle}>Meetup Preferences</label>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {(["door_pickup", "door_dropoff", "public_meetup"] as const).map((key) => (
-                <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: "#ccc", fontSize: 13 }}>
+                <label key={key} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", color: "#333", fontSize: 13 }}>
                   <input type="checkbox" checked={form.meetup_preferences[key]} onChange={() => toggleMeetup(key)} />
                   {key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
                 </label>
@@ -286,17 +279,16 @@ export default function ListingBuilder() {
               <button
                 onClick={publishToFacebook}
                 disabled={publishing || saving}
-                className="btn"
-                style={{ background: "#1877f2", color: "#fff" }}
+                className="btn btn-fb"
               >
                 {publishing ? "Publishing..." : "Publish to Facebook Marketplace"}
               </button>
             </div>
 
             {publishing && (
-              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, padding: 10, background: "#0d0d14", borderRadius: 6 }}>
+              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 8, padding: 10, background: "#F8F8F8", borderRadius: 8, border: "1px solid rgba(0,0,0,0.08)" }}>
                 <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
-                <span style={{ color: "#aaa", fontSize: 13 }}>
+                <span style={{ color: "#555", fontSize: 13 }}>
                   {publishStep === "downloading_photos" && "Downloading photos..."}
                   {publishStep === "starting_browser" && "Starting browser session..."}
                   {publishStep === "navigating" && "Opening Facebook Marketplace..."}
@@ -311,19 +303,17 @@ export default function ListingBuilder() {
 
             {publishResult && (
               <div style={{
-                marginTop: 12, padding: 12, borderRadius: 6,
-                background: publishResult.success ? "#0d1f14" : "#1f0d0d",
-                color: publishResult.success ? "#4ecdc4" : "#ff6b6b",
-                fontSize: 13,
+                marginTop: 12, padding: 12, borderRadius: 8,
+                background: publishResult.success ? "#f0fdf4" : "#fef2f2",
+                color: publishResult.success ? "#16a34a" : "#ef4444",
+                fontSize: 13, fontWeight: 600,
               }}>
                 {publishResult.success ? "Listed on Facebook Marketplace" : "Publish failed"}: {publishResult.message}
               </div>
             )}
           </div>
-
         </div>
 
-        {/* Right column: Media */}
         <div>
           <div className="card" style={{ marginBottom: 16 }}>
             <h3 style={{ margin: "0 0 16px", fontSize: 16 }}>Product Photos</h3>
@@ -332,26 +322,26 @@ export default function ListingBuilder() {
               {originalImageUrl && (
                 <div>
                   <label style={{ ...labelStyle, marginBottom: 8 }}>Original</label>
-                  <img src={originalImageUrl} alt="Original" style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 8, background: "#0d0d14" }} />
+                  <img src={originalImageUrl} alt="Original" style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 8, background: "#F8F8F8" }} />
                 </div>
               )}
 
               {mediaUrls.length > 0 && (
                 <div>
                   <label style={{ ...labelStyle, marginBottom: 8 }}>AI Lifestyle</label>
-                  <img src={mediaUrls[0]} alt="Lifestyle" style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 8, background: "#0d0d14" }} />
+                  <img src={mediaUrls[0]} alt="Lifestyle" style={{ width: "100%", height: 220, objectFit: "cover", borderRadius: 8, background: "#F8F8F8" }} />
                 </div>
               )}
             </div>
 
             {mediaUrls.length === 0 && (
-              <p style={{ color: "#555", fontSize: 12, marginTop: 12, textAlign: "center" }}>
+              <p style={{ color: "#888", fontSize: 12, marginTop: 12, textAlign: "center" }}>
                 Lifestyle photo auto-generates when item is uploaded
               </p>
             )}
 
             {(originalImageUrl || mediaUrls.length > 0) && (
-              <p style={{ color: "#666", fontSize: 11, marginTop: 10, textAlign: "center" }}>
+              <p style={{ color: "#888", fontSize: 11, marginTop: 10, textAlign: "center" }}>
                 Both photos will be uploaded when publishing
               </p>
             )}
@@ -364,22 +354,24 @@ export default function ListingBuilder() {
 
 const labelStyle: React.CSSProperties = {
   display: "block",
-  fontSize: 12,
+  fontSize: 11,
   color: "#888",
   marginBottom: 4,
   marginTop: 12,
   textTransform: "uppercase",
-  letterSpacing: 0.5,
+  letterSpacing: 0.8,
+  fontWeight: 800,
 };
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "8px 12px",
-  background: "#0d0d14",
-  border: "1px solid #2a2a3a",
-  borderRadius: 6,
-  color: "#e0e0e0",
+  background: "#FFFFFF",
+  border: "1.5px solid rgba(0,0,0,0.08)",
+  borderRadius: 8,
+  color: "#080808",
   fontSize: 14,
   marginBottom: 4,
   outline: "none",
+  fontFamily: "inherit",
 };

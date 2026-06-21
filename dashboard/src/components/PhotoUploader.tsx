@@ -89,7 +89,6 @@ export default function PhotoUploader({ onItemSaved }: Props) {
       setSaved((s) => ({ ...s, [index]: true }));
       onItemSaved();
 
-      // Auto-trigger research agent + media generation in background
       if (inserted?.id) {
         fetch("http://localhost:3001/api/research", {
           method: "POST",
@@ -122,28 +121,29 @@ export default function PhotoUploader({ onItemSaved }: Props) {
       <div
         {...getRootProps()}
         style={{
-          border: "2px dashed #555",
-          borderRadius: 12,
-          padding: 40,
+          border: "2.5px dashed rgba(0,0,0,0.14)",
+          borderRadius: 18,
+          padding: "2.5rem 2rem",
           textAlign: "center",
           cursor: "pointer",
-          background: isDragActive ? "#1a1a2e" : "#12121a",
-          transition: "background 0.2s",
+          background: isDragActive ? "#FFF0F7" : "#F8F8F8",
+          borderColor: isDragActive ? "#E875BB" : undefined,
+          transition: "background 0.2s, border-color 0.2s",
         }}
       >
         <input {...getInputProps()} />
-        <p style={{ fontSize: 18, margin: 0, color: "#aaa" }}>
+        <p style={{ fontSize: 18, margin: 0, color: "#333" }}>
           {isDragActive
             ? "Drop photos here..."
             : "Drag & drop product photos, or click to browse"}
         </p>
-        <p style={{ fontSize: 13, color: "#666", marginTop: 8 }}>
+        <p style={{ fontSize: 13, color: "#888", marginTop: 8 }}>
           JPG, PNG, WebP — multiple files supported
         </p>
       </div>
 
       {error && (
-        <div style={{ color: "#ff6b6b", marginTop: 16, padding: 12, background: "#2a1515", borderRadius: 8 }}>
+        <div style={{ color: "#ef4444", marginTop: 16, padding: 12, background: "#fef2f2", borderRadius: 8, fontSize: 14 }}>
           {error}
         </div>
       )}
@@ -151,7 +151,7 @@ export default function PhotoUploader({ onItemSaved }: Props) {
       {analyzing && (
         <div style={{ textAlign: "center", marginTop: 32 }}>
           <div className="spinner" />
-          <p style={{ color: "#aaa" }}>Analyzing {previews.length} photo(s) with GPT-4o Vision...</p>
+          <p style={{ color: "#888", marginTop: 12 }}>Analyzing {previews.length} photo(s) with GPT-4o Vision...</p>
         </div>
       )}
 
@@ -188,19 +188,17 @@ export default function PhotoUploader({ onItemSaved }: Props) {
                   <span className="tag">{item.category}</span>
                   <span className="tag">{item.condition}</span>
                 </div>
-                {item.model && <p style={{ margin: "0 0 4px", color: "#aaa", fontSize: 13 }}>Model: {item.model}</p>}
-                <p style={{ margin: "0 0 8px", color: "#ccc", fontSize: 14 }}>{item.description}</p>
+                {item.model && <p style={{ margin: "0 0 4px", color: "#888", fontSize: 13 }}>Model: {item.model}</p>}
+                <p style={{ margin: "0 0 8px", color: "#555", fontSize: 14 }}>{item.description}</p>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {item.tags.map((t) => (
-                    <span key={t} style={{ fontSize: 11, background: "#222", padding: "2px 8px", borderRadius: 12, color: "#888" }}>
-                      {t}
-                    </span>
+                    <span key={t} className="chip">{t}</span>
                   ))}
                 </div>
               </div>
               <div style={{ flexShrink: 0, alignSelf: "center" }}>
                 {saved[i] ? (
-                  <span style={{ color: "#4ecdc4" }}>Saved</span>
+                  <span style={{ color: "#22c55e", fontWeight: 700 }}>Saved</span>
                 ) : (
                   <button onClick={() => saveItem(i)} disabled={saving[i]} className="btn btn-primary">
                     {saving[i] ? "Saving..." : "Save"}

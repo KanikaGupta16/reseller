@@ -86,8 +86,8 @@ export default function PriceInfo() {
     }
   };
 
-  if (loading) return <p style={{ color: "#aaa" }}>Loading price data...</p>;
-  if (items.length === 0) return <p style={{ color: "#666" }}>No items yet. Upload products first.</p>;
+  if (loading) return <p style={{ color: "#888" }}>Loading price data...</p>;
+  if (items.length === 0) return <p style={{ color: "#888" }}>No items yet. Upload products first.</p>;
 
   return (
     <div>
@@ -123,7 +123,7 @@ export default function PriceInfo() {
                 {isRunning && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
-                    <span style={{ color: "#aaa", fontSize: 13 }}>
+                    <span style={{ color: "#888", fontSize: 13 }}>
                       {job.step || "starting"}... {job.progress}%
                     </span>
                   </div>
@@ -131,7 +131,7 @@ export default function PriceInfo() {
 
                 {hasPrice && (
                   <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                    <span style={{ color: "#4ecdc4", fontSize: 22, fontWeight: 600 }}>
+                    <span style={{ color: "#E875BB", fontSize: 22, fontWeight: 900 }}>
                       ${item.research_suggested_price}
                     </span>
                     {item.research_range && (
@@ -143,9 +143,10 @@ export default function PriceInfo() {
                       <span style={{
                         fontSize: 11,
                         padding: "2px 8px",
-                        borderRadius: 10,
-                        background: item.research_confidence === "high" ? "#1a3a2a" : item.research_confidence === "medium" ? "#3a3a1a" : "#3a1a1a",
-                        color: item.research_confidence === "high" ? "#4ecdc4" : item.research_confidence === "medium" ? "#e0c040" : "#ff6b6b",
+                        borderRadius: 100,
+                        fontWeight: 700,
+                        background: item.research_confidence === "high" ? "#f0fdf4" : item.research_confidence === "medium" ? "#fefce8" : "#fef2f2",
+                        color: item.research_confidence === "high" ? "#16a34a" : item.research_confidence === "medium" ? "#ca8a04" : "#ef4444",
                       }}>
                         {item.research_confidence} confidence
                       </span>
@@ -160,7 +161,7 @@ export default function PriceInfo() {
                 )}
 
                 {job?.status === "failed" && (
-                  <div style={{ color: "#ff6b6b", fontSize: 13, marginTop: 4 }}>
+                  <div style={{ color: "#ef4444", fontSize: 13, marginTop: 4 }}>
                     Failed: {job.error || "Unknown error"}
                     <button onClick={(e) => { e.stopPropagation(); startResearch(item.id); }} className="btn btn-primary" style={{ fontSize: 11, padding: "2px 10px", marginLeft: 8 }}>
                       Retry
@@ -168,15 +169,15 @@ export default function PriceInfo() {
                   </div>
                 )}
               </div>
-              <div style={{ flexShrink: 0, alignSelf: "center", color: "#555", fontSize: 18 }}>
+              <div style={{ flexShrink: 0, alignSelf: "center", color: "#bbb", fontSize: 18 }}>
                 {isExpanded ? "▲" : "▼"}
               </div>
             </div>
 
             {isExpanded && job && (
-              <div style={{ marginTop: 16, borderTop: "1px solid #2a2a3a", paddingTop: 16 }}>
+              <div style={{ marginTop: 16, borderTop: "1.5px solid rgba(0,0,0,0.08)", paddingTop: 16 }}>
                 {item.research_reasoning && (
-                  <p style={{ color: "#ccc", fontSize: 14, margin: "0 0 16px", lineHeight: 1.5 }}>
+                  <p style={{ color: "#555", fontSize: 14, margin: "0 0 16px", lineHeight: 1.5 }}>
                     {item.research_reasoning}
                   </p>
                 )}
@@ -190,8 +191,9 @@ export default function PriceInfo() {
                           fontSize: 12,
                           padding: "4px 10px",
                           borderRadius: 8,
-                          background: "#1a1a24",
-                          color: status.includes("found") ? "#4ecdc4" : "#888",
+                          background: "#F8F8F8",
+                          color: status.includes("found") ? "#16a34a" : "#888",
+                          fontWeight: 600,
                         }}>
                           {site}: {status}
                         </span>
@@ -201,8 +203,8 @@ export default function PriceInfo() {
                 )}
 
                 {job.comps && job.comps.length > 0 && (
-                  <div>
-                    <h4 style={{ margin: "0 0 8px", fontSize: 13, color: "#888" }}>
+                  <div style={{ borderRadius: 10, border: "1.5px solid rgba(0,0,0,0.08)", overflow: "hidden" }}>
+                    <h4 style={{ margin: 0, padding: "0.75rem 0.875rem", fontSize: 13, color: "#888", background: "#F8F8F8" }}>
                       Comparable Listings ({job.comps.length})
                     </h4>
                     <table style={{ fontSize: 13 }}>
@@ -219,12 +221,12 @@ export default function PriceInfo() {
                           <tr key={i}>
                             <td>
                               {comp.url && comp.url !== "#" ? (
-                                <a href={comp.url} target="_blank" rel="noreferrer" style={{ color: "#8888cc", textDecoration: "none" }}>
+                                <a href={comp.url} target="_blank" rel="noreferrer" style={{ color: "#E875BB", textDecoration: "none" }}>
                                   {comp.title}
                                 </a>
                               ) : comp.title}
                             </td>
-                            <td style={{ color: "#4ecdc4" }}>${comp.price}</td>
+                            <td style={{ color: "#080808", fontWeight: 700 }}>${comp.price}</td>
                             <td>{comp.source}</td>
                             <td>{comp.condition}</td>
                           </tr>

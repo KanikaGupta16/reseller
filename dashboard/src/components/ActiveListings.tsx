@@ -34,8 +34,8 @@ export default function ActiveListings() {
       });
   }, []);
 
-  if (loading) return <p style={{ color: "#aaa" }}>Loading active listings...</p>;
-  if (items.length === 0) return <p style={{ color: "#666" }}>No active listings yet. Publish items from the Listing Builder tab.</p>;
+  if (loading) return <p style={{ color: "#888" }}>Loading active listings...</p>;
+  if (items.length === 0) return <p style={{ color: "#888" }}>No active listings yet. Publish items from the Listing Builder tab.</p>;
 
   return (
     <div>
@@ -54,21 +54,21 @@ export default function ActiveListings() {
               {item.condition && <span className="tag">{item.condition}</span>}
             </div>
             <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 6 }}>
-              <span style={{ color: "#4ecdc4", fontSize: 20, fontWeight: 600 }}>
+              <span style={{ color: "#E875BB", fontSize: 20, fontWeight: 900 }}>
                 ${item.listing_price ?? item.research_suggested_price ?? "—"}
               </span>
               {item.location && <span style={{ color: "#888", fontSize: 13 }}>{item.location}</span>}
             </div>
             {item.description && (
-              <p style={{ margin: "0 0 6px", color: "#aaa", fontSize: 13, lineHeight: 1.4 }}>
+              <p style={{ margin: "0 0 6px", color: "#555", fontSize: 13, lineHeight: 1.4 }}>
                 {item.description.length > 150 ? item.description.slice(0, 150) + "..." : item.description}
               </p>
             )}
             {item.meetup_preferences && (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-                {item.meetup_preferences.door_pickup && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#1a1a2e", color: "#888" }}>Door Pickup</span>}
-                {item.meetup_preferences.door_dropoff && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#1a1a2e", color: "#888" }}>Door Dropoff</span>}
-                {item.meetup_preferences.public_meetup && <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 10, background: "#1a1a2e", color: "#888" }}>Public Meetup</span>}
+                {item.meetup_preferences.door_pickup && <span className="chip">Door Pickup</span>}
+                {item.meetup_preferences.door_dropoff && <span className="chip">Door Dropoff</span>}
+                {item.meetup_preferences.public_meetup && <span className="chip">Public Meetup</span>}
               </div>
             )}
           </div>
@@ -79,9 +79,10 @@ export default function ActiveListings() {
                   fontSize: 12,
                   padding: "4px 10px",
                   borderRadius: 6,
-                  background: platform === "facebook" ? "#1877f2" : "#222",
+                  background: platform === "facebook" ? "#1877f2" : "#080808",
                   color: "#fff",
                   textAlign: "center",
+                  fontWeight: 600,
                 }}>
                   {platform === "facebook" ? "Facebook" : platform}
                 </span>
