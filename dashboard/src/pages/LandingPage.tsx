@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-const EDGE_FN = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-item`
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 const SLIDE_COUNT = 5
 
@@ -68,8 +70,9 @@ export default function LandingPage() {
   const [studio, setStudio]         = useState<AgentState>('idle')
   const [closer, setCloser]         = useState<AgentState>('idle')
   const [item]                      = useState(() => MOCK_ITEMS[Math.floor(Math.random() * MOCK_ITEMS.length)])
-  const [realItem, setRealItem]     = useState<{ title: string; tags: string[] } | null>(null)
-  const [accessToken] = useState<string | null>(null)
+  const [realItem, setRealItem]     = useState<{ title: string; tags: string[]; price?: number } | null>(null)
+  const [videoUrl, setVideoUrl]     = useState<string | null>(null)
+  const [itemId,   setItemId]       = useState<string | null>(null)
 
   useEffect(() => {
     let id: number
@@ -146,45 +149,104 @@ export default function LandingPage() {
 
   const handleFile = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) return
+
+    // Show preview immediately
     const reader = new FileReader()
     reader.onload = e => setUploadedImg(e.target?.result as string)
     reader.readAsDataURL(file)
 
-    setRealItem(null)
+    setRealItem(null); setVideoUrl(null); setItemId(null)
     setScout('idle'); setStudio('idle'); setCloser('idle')
     setUploadStep('processing')
     setScout('working')
 
     try {
-      const formData = new FormData()
-      formData.append('images', file)
+      // 1. Upload image to Supabase storage
+      const ext  = file.name.split('.').pop() || 'jpg'
+      const path = `${crypto.randomUUID()}.${ext}`
+      const uploadRes = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/product-images/${path}`,
+        { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': file.type }, body: file }
+      )
+      if (!uploadRes.ok) throw new Error('Storage upload failed')
+      const imageUrl = `${SUPABASE_URL}/storage/v1/object/public/product-images/${path}`
 
-      const res = await fetch(EDGE_FN, {
+      // 2. Save item to DB
+      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/items`, {
         method: 'POST',
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-        body: formData,
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ image_url: imageUrl, title: 'Analysing...', category: 'other', condition: 'good' }),
       })
+      const [row] = await insertRes.json()
+      const newItemId = row?.id
+      if (!newItemId) throw new Error('DB insert failed')
+      setItemId(newItemId)
 
-      const data = await res.json()
+      // 3. Trigger Scout (research) + Studio (media)
+      await Promise.all([
+        fetch(`${API}/api/research`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: newItemId }) }).catch(() => {}),
+        fetch(`${API}/api/media/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: newItemId }) }).catch(() => {}),
+      ])
+
+      // 4. Poll Scout progress
+      let scoutDone = false
+      for (let i = 0; i < 30 && !scoutDone; i++) {
+        await new Promise(r => setTimeout(r, 3000))
+        try {
+          const r = await fetch(`${API}/api/research/item/${newItemId}`)
+          const d = await r.json()
+          if (d?.status === 'complete' || d?.status === 'done') {
+            scoutDone = true
+            setRealItem({
+              title: d.title || item.title,
+              tags: d.tags || item.tags,
+              price: d.result?.suggested_price,
+            })
+          }
+        } catch {}
+      }
       setScout('done'); setStudio('working')
-      setTimeout(() => { setStudio('done'); setCloser('working') }, 900)
-      setTimeout(() => {
-        setCloser('done')
-        setRealItem({
-          title: data.title || item.title,
-          tags: data.attributes?.style_tags || item.tags,
-        })
-        setUploadStep('done')
-      }, 1800)
+
+      // 5. Poll Studio (media)
+      let studioDone = false
+      for (let i = 0; i < 20 && !studioDone; i++) {
+        await new Promise(r => setTimeout(r, 3000))
+        try {
+          const r = await fetch(`${API}/api/media/status/${newItemId}`)
+          const d = await r.json()
+          if (d?.status === 'done' && d?.count > 0) studioDone = true
+        } catch {}
+      }
+      setStudio('done'); setCloser('working')
+
+      // 6. Trigger Pika video generation
+      fetch(`${API}/api/video/generate`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ itemId: newItemId }) }).catch(() => {})
+
+      // 7. Poll video
+      for (let i = 0; i < 36; i++) {
+        await new Promise(r => setTimeout(r, 5000))
+        try {
+          const r = await fetch(`${API}/api/video/status/${newItemId}`)
+          const d = await r.json()
+          if (d?.status === 'done' && d?.videoUrl) {
+            setVideoUrl(d.videoUrl)
+            break
+          }
+        } catch {}
+      }
+      setCloser('done'); setUploadStep('done')
+
     } catch {
-      setTimeout(() => { setScout('done'); setStudio('working') }, 1600)
-      setTimeout(() => { setStudio('done'); setCloser('working') }, 3000)
-      setTimeout(() => { setCloser('done'); setUploadStep('done') }, 4200)
+      // Graceful degraded flow with mock timing
+      setTimeout(() => { setScout('done'); setStudio('working') }, 2000)
+      setTimeout(() => { setStudio('done'); setCloser('working') }, 4000)
+      setTimeout(() => { setCloser('done'); setRealItem({ title: item.title, tags: item.tags }); setUploadStep('done') }, 6000)
     }
-  }, [accessToken, item])
+  }, [item])
 
   const resetUpload = () => {
     setUploadStep('idle'); setUploadedImg(null); setRealItem(null)
+    setVideoUrl(null); setItemId(null)
     setScout('idle'); setStudio('idle'); setCloser('idle')
   }
 
@@ -327,15 +389,15 @@ export default function LandingPage() {
               </>}
 
               {uploadStep === 'done' && <>
-                <div className="step-lbl">done!</div>
+                <div className="step-lbl">✅ done!</div>
                 <h2 className="sl-h2">your listing<br />is <em>live.</em> 🎉</h2>
                 <div className="result-card">
-                  <div className="rc-badge">ready to push</div>
+                  <div className="rc-badge">✅ listing ready</div>
                   <div className="rc-title">{realItem?.title ?? item.title}</div>
                   <div className="rc-row">
                     <div>
-                      <div className="rc-price">${item.price}</div>
-                      <div className="rc-price-lbl">Scout&apos;s price</div>
+                      <div className="rc-price">${realItem?.price ?? item.price}</div>
+                      <div className="rc-price-lbl">Researcher&apos;s price</div>
                     </div>
                     <div className="rc-demand">
                       <span className="rc-bar" style={{ '--pct': `${item.demand}%` } as React.CSSProperties} />
@@ -345,6 +407,11 @@ export default function LandingPage() {
                   <div className="chip-row" style={{ justifyContent: 'flex-start', marginTop: '0.75rem' }}>
                     {(realItem?.tags ?? item.tags).map(t => <span key={t} className="chip">{t}</span>)}
                   </div>
+                  {itemId && (
+                    <div style={{ marginTop: '0.875rem', fontSize: '0.65rem', color: 'var(--muted)', letterSpacing: '0.06em' }}>
+                      Item ID: {itemId.slice(0, 8)}…
+                    </div>
+                  )}
                 </div>
                 <div className="rc-ctas">
                   <button className="pill pill-big" style={{ background: 'var(--pink-2)' }}>Push live →</button>
@@ -364,15 +431,42 @@ export default function LandingPage() {
               {(uploadStep === 'processing' || uploadStep === 'done') && uploadedImg && (
                 <div className="upload-preview-wrap">
                   <div className="upload-preview-col">
-                    <img src={uploadedImg} alt="Your item" className="upload-img" />
-                    {uploadStep === 'done' && (
-                      <div className="upload-done-badge">listed on depop + fb 🎉</div>
+                    {/* Show Pika video when ready, otherwise show uploaded image */}
+                    {videoUrl ? (
+                      <div style={{ position: 'relative' }}>
+                        {videoUrl.endsWith('.mp4') || videoUrl.includes('pika') ? (
+                          <video src={videoUrl} autoPlay loop muted playsInline
+                            style={{ width: 160, borderRadius: 16, display: 'block', boxShadow: '0 16px 48px rgba(0,0,0,0.18)' }} />
+                        ) : (
+                          <img src={videoUrl} alt="Generated" className="upload-img" />
+                        )}
+                        <div className="upload-done-badge" style={{ background: 'var(--pink-2)' }}>
+                          🎬 {videoUrl.includes('pika') ? 'Pika video ready' : 'preview ready'}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ position: 'relative' }}>
+                        <img src={uploadedImg} alt="Your item" className="upload-img" />
+                        {uploadStep === 'done' && !videoUrl && (
+                          <div className="upload-done-badge">listed on depop + fb 🎉</div>
+                        )}
+                        {uploadStep === 'processing' && closer !== 'idle' && !videoUrl && (
+                          <div className="upload-done-badge" style={{ background: 'var(--black)', animation: 'blink 1s ease-in-out infinite' }}>
+                            🎬 Generating video…
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                   <div className="tips-col">
                     {tips.map((t, i) => (
                       <div key={i} className="tip" style={{ animationDelay: `${i * 0.22}s` }}>{t}</div>
                     ))}
+                    {videoUrl && (
+                      <div className="tip" style={{ animationDelay: '0s', background: '#FFF0F7', color: 'var(--pink-2)', fontWeight: 700 }}>
+                        🎬 {videoUrl.includes('pika') ? 'Pika video generated!' : 'Preview video ready'}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
