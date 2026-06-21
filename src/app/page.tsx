@@ -88,6 +88,29 @@ function AnimatedNum({ target, prefix = '', suffix = '', isActive }: {
 /*  Agent row                                                               */
 /* ─────────────────────────────────────────────────────────────────────── */
 type AgentState = 'idle' | 'working' | 'done'
+
+type ChatMsg = { role: 'user' | 'assistant'; content: string }
+
+type AnalysisResult = {
+  fields: {
+    name: string
+    brand: string | null
+    model: string | null
+    category: string
+    condition: string
+    dimensions: string | null
+    market_price_usd: { low: number; mid: number; high: number }
+    tags: string[]
+    notes: string
+  }
+  follow_up_question: string | null
+  assistant_message: string
+}
+
+function composeAssistantBubble(r: AnalysisResult): string {
+  if (r.follow_up_question) return `${r.assistant_message}\n\n${r.follow_up_question}`
+  return r.assistant_message
+}
 function AgentRow({ icon, name, label, state, delay }: {
   icon: string; name: string; label: string; state: AgentState; delay: number
 }) {
@@ -125,6 +148,11 @@ export default function Home() {
   const [item]                      = useState(() => MOCK_ITEMS[Math.floor(Math.random() * MOCK_ITEMS.length)])
   const [realItem, setRealItem]     = useState<{ title: string; tags: string[] } | null>(null)
   const [accessToken, setAccessToken] = useState<string | null>(null)
+  const [analysis, setAnalysis]     = useState<AnalysisResult | null>(null)
+  const [imageUrl, setImageUrl]     = useState<string | null>(null)
+  const [chatMessages, setChatMessages] = useState<ChatMsg[]>([])
+  const [chatInput, setChatInput]   = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
 
   /* waveform canvas */
   useEffect(() => {
@@ -213,6 +241,16 @@ export default function Home() {
   }, [goTo])
 
   /* ─── upload flow ─── */
+  const runAnalysis = useCallback(async (url: string, msgs: ChatMsg[]) => {
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl: url, messages: msgs }),
+    })
+    if (!res.ok) throw new Error(`analyze failed: ${res.status}`)
+    return (await res.json()) as AnalysisResult
+  }, [])
+
   const handleFile = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) return
 
@@ -222,43 +260,69 @@ export default function Home() {
     reader.readAsDataURL(file)
 
     setRealItem(null)
+    setAnalysis(null)
+    setImageUrl(null)
+    setChatMessages([])
+    setChatInput('')
     setScout('idle'); setStudio('idle'); setCloser('idle')
     setUploadStep('processing')
     setScout('working')
 
-    try {
-      const formData = new FormData()
-      formData.append('images', file)
+    // Save the photo to Supabase Storage (bucket: 'uploads').
+    const { data: { user } } = await supabase.auth.getUser()
+    const ext = file.name.split('.').pop() || 'jpg'
+    const path = `${user?.id ?? 'anon'}/${Date.now()}-${crypto.randomUUID()}.${ext}`
+    const { data: upData, error: upErr } = await supabase.storage
+      .from('uploads')
+      .upload(path, file, { contentType: file.type, upsert: false })
 
-      const res = await fetch(EDGE_FN, {
-        method: 'POST',
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-        body: formData,
-      })
-
-      const data = await res.json()
-
-      // Animate through Studio → Closer with real results at the end
-      setScout('done'); setStudio('working')
-      setTimeout(() => { setStudio('done'); setCloser('working') }, 900)
-      setTimeout(() => {
-        setCloser('done')
-        setRealItem({
-          title: data.title || item.title,
-          tags: data.attributes?.style_tags || item.tags,
-        })
-        setUploadStep('done')
-      }, 1800)
-    } catch {
-      // Fallback: mock animation
-      setTimeout(() => { setScout('done'); setStudio('working') }, 1600)
-      setTimeout(() => { setStudio('done'); setCloser('working') }, 3000)
-      setTimeout(() => { setCloser('done'); setUploadStep('done') }, 4200)
+    if (upErr || !upData) {
+      console.warn('[supabase] upload failed', upErr)
+      setUploadStep('idle')
+      return
     }
-  }, [accessToken, item])
+    const publicUrl = supabase.storage.from('uploads').getPublicUrl(upData.path).data.publicUrl
+    setImageUrl(publicUrl)
+
+    // Cosmetic agent animation (Scout → Studio → Closer)
+    setTimeout(() => { setScout('done'); setStudio('working') }, 700)
+    setTimeout(() => { setStudio('done'); setCloser('working') }, 1500)
+
+    try {
+      const result = await runAnalysis(publicUrl, [])
+      setAnalysis(result)
+      setChatMessages([{ role: 'assistant', content: composeAssistantBubble(result) }])
+      setCloser('done')
+      setUploadStep('done')
+    } catch (err) {
+      console.error('[analyze] failed', err)
+      setCloser('done')
+      setUploadStep('done')
+    }
+  }, [runAnalysis])
+
+  const sendChat = useCallback(async () => {
+    if (!chatInput.trim() || !imageUrl || chatLoading) return
+    const userMsg: ChatMsg = { role: 'user', content: chatInput.trim() }
+    const next = [...chatMessages, userMsg]
+    setChatMessages(next)
+    setChatInput('')
+    setChatLoading(true)
+    try {
+      const result = await runAnalysis(imageUrl, next)
+      setAnalysis(result)
+      setChatMessages([...next, { role: 'assistant', content: composeAssistantBubble(result) }])
+    } catch (err) {
+      console.error('[analyze] follow-up failed', err)
+      setChatMessages([...next, { role: 'assistant', content: 'sorry, something broke — try again?' }])
+    } finally {
+      setChatLoading(false)
+    }
+  }, [chatInput, chatMessages, imageUrl, chatLoading, runAnalysis])
 
   const resetUpload = () => {
     setUploadStep('idle'); setUploadedImg(null); setRealItem(null)
+    setAnalysis(null); setImageUrl(null); setChatMessages([]); setChatInput('')
     setScout('idle'); setStudio('idle'); setCloser('idle')
   }
 
@@ -412,11 +476,18 @@ export default function Home() {
                 <h2 className="sl-h2">your listing<br />is <em>live.</em> 🎉</h2>
                 <div className="result-card">
                   <div className="rc-badge">✅ ready to push</div>
-                  <div className="rc-title">{realItem?.title ?? item.title}</div>
+                  <div className="rc-title">{analysis?.fields.name ?? realItem?.title ?? item.title}</div>
+                  {analysis && (
+                    <div className="rc-meta" style={{ fontSize: '0.8125rem', color: 'rgba(0,0,0,0.55)', marginTop: '0.25rem' }}>
+                      {[analysis.fields.brand, analysis.fields.model, analysis.fields.condition, analysis.fields.dimensions].filter(Boolean).join(' · ')}
+                    </div>
+                  )}
                   <div className="rc-row">
                     <div>
-                      <div className="rc-price">${item.price}</div>
-                      <div className="rc-price-lbl">Scout&apos;s price</div>
+                      <div className="rc-price">${analysis?.fields.market_price_usd.mid ?? item.price}</div>
+                      <div className="rc-price-lbl">
+                        {analysis ? `range $${analysis.fields.market_price_usd.low}–$${analysis.fields.market_price_usd.high}` : "Scout's price"}
+                      </div>
                     </div>
                     <div className="rc-demand">
                       <span className="rc-bar" style={{ '--pct': `${item.demand}%` } as React.CSSProperties} />
@@ -424,10 +495,59 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="chip-row" style={{ justifyContent: 'flex-start', marginTop: '0.75rem' }}>
-                    {(realItem?.tags ?? item.tags).map(t => <span key={t} className="chip">{t}</span>)}
+                    {(analysis?.fields.tags ?? realItem?.tags ?? item.tags).map(t => <span key={t} className="chip">{t}</span>)}
                   </div>
                 </div>
-                <div className="rc-ctas">
+
+                {analysis && (
+                  <div className="chat-panel" style={{ marginTop: '1rem', maxHeight: 260, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {chatMessages.map((m, i) => (
+                      <div key={i} className={`chat-bubble chat-bubble--${m.role}`} style={{
+                        alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                        background: m.role === 'user' ? 'var(--pink-2, #ff6b9d)' : 'rgba(0,0,0,0.06)',
+                        color: m.role === 'user' ? '#fff' : '#111',
+                        padding: '0.5rem 0.75rem',
+                        borderRadius: 14,
+                        fontSize: '0.875rem',
+                        lineHeight: 1.4,
+                        maxWidth: '85%',
+                        whiteSpace: 'pre-line',
+                      }}>
+                        {m.content}
+                      </div>
+                    ))}
+                    {chatLoading && <div className="chat-bubble" style={{ alignSelf: 'flex-start', color: 'rgba(0,0,0,0.4)', fontSize: '0.875rem' }}>typing…</div>}
+                  </div>
+                )}
+
+                {analysis && (
+                  <form
+                    onSubmit={e => { e.preventDefault(); sendChat() }}
+                    style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }}
+                  >
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      placeholder={analysis.follow_up_question ? 'reply…' : 'ask anything about this item…'}
+                      disabled={chatLoading}
+                      style={{
+                        flex: 1, padding: '0.625rem 0.875rem', borderRadius: 999,
+                        border: '1px solid rgba(0,0,0,0.15)', fontSize: '0.875rem', background: '#fff',
+                      }}
+                    />
+                    <button
+                      type="submit"
+                      disabled={chatLoading || !chatInput.trim()}
+                      className="pill"
+                      style={{ background: 'var(--pink-2, #ff6b9d)', color: '#fff', opacity: chatLoading || !chatInput.trim() ? 0.5 : 1 }}
+                    >
+                      send
+                    </button>
+                  </form>
+                )}
+
+                <div className="rc-ctas" style={{ marginTop: '1rem' }}>
                   <button className="pill pill-big" style={{ background: 'var(--pink-2)' }}>Push live →</button>
                   <button className="pill pill-big pill-outline" onClick={resetUpload}>Try another</button>
                 </div>
