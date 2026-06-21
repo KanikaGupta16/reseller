@@ -10,15 +10,14 @@ interface RecentItem {
   created_at: string; status: string | null;
 }
 
-// Mock next pickup — wire to calendar API when ready
 const NEXT_PICKUP = { date: "Sat 28 Jun", time: "2:00 PM", location: "Williamsburg, Brooklyn" };
 
 const STAT_TILES = [
-  { key: "total",       label: "Total Items",   emoji: "📦", cls: "card-stat-black",  nav: "" },
-  { key: "needsReview", label: "Needs Review",  emoji: "👀", cls: "card-stat-yellow", nav: "price-info" },
-  { key: "inProgress",  label: "In Progress",   emoji: "🔄", cls: "card-stat-blue",   nav: "listing-builder" },
-  { key: "listed",      label: "Live Listings", emoji: "✅", cls: "card-stat-green",  nav: "active-listings" },
-  { key: "sold",        label: "Sold",          emoji: "🎉", cls: "card-stat-pink",   nav: "active-listings" },
+  { key: "total",       label: "Total Items",   sub: "All uploaded",        emoji: "📦", cls: "card-stat-black",  nav: "" },
+  { key: "needsReview", label: "Needs Review",  sub: "Awaiting pricing",    emoji: "👀", cls: "card-stat-yellow", nav: "price-info" },
+  { key: "inProgress",  label: "In Progress",   sub: "Ready to publish",    emoji: "🔄", cls: "card-stat-blue",   nav: "listing-builder" },
+  { key: "listed",      label: "Live Listings", sub: "On marketplace",      emoji: "✅", cls: "card-stat-green",  nav: "active-listings" },
+  { key: "sold",        label: "Sold",          sub: "Deals closed",        emoji: "🎉", cls: "card-stat-pink",   nav: "active-listings" },
 ];
 
 const QUICK_ACTIONS = [
@@ -29,10 +28,17 @@ const QUICK_ACTIONS = [
   { label: "Messenger", emoji: "💬", tab: "messenger",       desc: "Reply to buyers" },
 ];
 
-const H2 = ({ children }: { children: React.ReactNode }) => (
-  <h2 style={{ fontWeight: 900, fontSize: "clamp(1.5rem, 2.5vw, 2rem)", letterSpacing: "-0.04em", textTransform: "lowercase", lineHeight: 1, marginBottom: "1.25rem" }}>
-    {children}
-  </h2>
+/* Section header matching the nav "Overview" style */
+const SectionHead = ({ accent, title, subtitle }: { accent: string; title: string; subtitle: string }) => (
+  <div className="db-section-header" style={{ marginBottom: "1.25rem" }}>
+    <div className="db-section-title-group">
+      <div className={`db-section-accent ${accent}`} />
+      <div>
+        <div className="db-section-title">{title}</div>
+        <div className="db-section-subtitle">{subtitle}</div>
+      </div>
+    </div>
+  </div>
 );
 
 export default function Overview({ onNavigate }: { onNavigate: (tab: string) => void }) {
@@ -70,10 +76,10 @@ export default function Overview({ onNavigate }: { onNavigate: (tab: string) => 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "2.5rem" }}>
 
-      {/* ══ ROW 1: stat tiles + pickup ══ */}
+      {/* ══ Stats: 2 rows × 3 cols ══ */}
       <div>
-        <H2>at a glance.</H2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr) 1.4fr", gap: "1rem" }}>
+        <SectionHead accent="accent-overview" title="At a Glance" subtitle="Your reselling in numbers" />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
 
           {/* 5 metric tiles */}
           {STAT_TILES.map(s => {
@@ -81,100 +87,95 @@ export default function Overview({ onNavigate }: { onNavigate: (tab: string) => 
             return (
               <div key={s.key} className={`card-stat ${s.cls}`}
                 onClick={() => s.nav && onNavigate(s.nav)}
-                style={{ cursor: s.nav ? "pointer" : "default", minHeight: 160 }}
+                style={{ cursor: s.nav ? "pointer" : "default", minHeight: 150 }}
               >
-                {/* Label top */}
-                <div style={{ fontSize: "var(--text-xs)", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.6 }}>
+                <div style={{ fontSize: "var(--text-xs)", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", opacity: 0.55 }}>
                   {s.label}
                 </div>
-                {/* Value + emoji right */}
-                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: "auto" }}>
-                  <div style={{ fontSize: "clamp(2.5rem,4vw,3.75rem)", fontWeight: 900, letterSpacing: "-0.05em", lineHeight: 1 }}>
+                <div style={{ fontSize: "var(--text-xs)", fontWeight: 600, opacity: 0.4, marginTop: "0.125rem" }}>{s.sub}</div>
+                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: "auto", paddingTop: "1rem" }}>
+                  <div style={{ fontSize: "clamp(3rem,5vw,4.5rem)", fontWeight: 900, letterSpacing: "-0.06em", lineHeight: 1 }}>
                     {val}
                   </div>
-                  <div style={{ fontSize: "2.25rem", lineHeight: 1, flexShrink: 0 }}>{s.emoji}</div>
+                  <div style={{ fontSize: "2.5rem", lineHeight: 1, flexShrink: 0 }}>{s.emoji}</div>
                 </div>
               </div>
             );
           })}
 
-          {/* Next pickup tile */}
+          {/* Next Pickup tile — 6th cell */}
           <div style={{
             background: "var(--black)", borderRadius: "var(--radius-md)", padding: "1.75rem",
-            display: "flex", flexDirection: "column", gap: "0.5rem", minHeight: 160,
+            display: "flex", flexDirection: "column", minHeight: 150,
             cursor: "pointer", transition: "transform 0.14s",
           }}
             onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-3px)")}
             onMouseLeave={e => (e.currentTarget.style.transform = "")}
           >
-            <div style={{ fontSize: "var(--text-xs)", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)" }}>
+            <div style={{ fontSize: "var(--text-xs)", fontWeight: 800, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
               Next Pickup
             </div>
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: "auto" }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: "auto", paddingTop: "1rem" }}>
               <div>
-                <div style={{ fontSize: "1.5rem", fontWeight: 900, letterSpacing: "-0.04em", color: "var(--yellow)", lineHeight: 1 }}>
+                <div style={{ fontSize: "clamp(1.375rem,2.5vw,1.75rem)", fontWeight: 900, letterSpacing: "-0.04em", color: "var(--yellow)", lineHeight: 1 }}>
                   {NEXT_PICKUP.date}
                 </div>
                 <div style={{ fontSize: "1rem", fontWeight: 700, color: "rgba(255,255,255,0.7)", marginTop: "0.25rem" }}>
                   {NEXT_PICKUP.time}
                 </div>
-                <div style={{ fontSize: "var(--text-xs)", color: "rgba(255,255,255,0.4)", marginTop: "0.375rem", fontWeight: 600 }}>
+                <div style={{ fontSize: "var(--text-xs)", color: "rgba(255,255,255,0.38)", marginTop: "0.375rem", fontWeight: 600 }}>
                   📍 {NEXT_PICKUP.location}
                 </div>
               </div>
-              <div style={{ fontSize: "2rem", opacity: 0.3 }}>📅</div>
+              <div style={{ fontSize: "2rem", opacity: 0.2 }}>📅</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ══ ROW 2: revenue + quick actions ══ */}
-      <div style={{ display: "grid", gridTemplateColumns: metrics.revenue > 0 ? "1fr 2fr" : "1fr", gap: "1rem" }}>
-
-        {/* Revenue */}
-        {metrics.revenue > 0 && (
-          <div style={{
-            background: "var(--black)", borderRadius: "var(--radius-md)", padding: "2rem",
-            display: "flex", flexDirection: "column", justifyContent: "space-between",
-          }}>
-            <div style={{ fontSize: "var(--text-xs)", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
+      {/* ══ Revenue ══ */}
+      {metrics.revenue > 0 && (
+        <div style={{
+          background: "var(--black)", borderRadius: "var(--radius-md)", padding: "2rem",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <div>
+            <div style={{ fontSize: "var(--text-xs)", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)", marginBottom: "0.5rem" }}>
               Total Revenue
             </div>
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-              <div style={{ fontSize: "clamp(2.5rem,5vw,4rem)", fontWeight: 900, letterSpacing: "-0.05em", color: "var(--yellow)", lineHeight: 1 }}>
-                ${metrics.revenue.toLocaleString()}
-              </div>
-              <div style={{ fontSize: "3rem", opacity: 0.15 }}>💰</div>
+            <div style={{ fontSize: "clamp(2.5rem,5vw,4rem)", fontWeight: 900, letterSpacing: "-0.05em", color: "var(--yellow)", lineHeight: 1 }}>
+              ${metrics.revenue.toLocaleString()}
             </div>
           </div>
-        )}
+          <div style={{ fontSize: "3.5rem", opacity: 0.15 }}>💰</div>
+        </div>
+      )}
 
-        {/* Quick actions */}
-        <div>
-          <H2>quick actions.</H2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.75rem" }}>
-            {QUICK_ACTIONS.map(a => (
-              <div key={a.tab} className="card"
-                style={{ cursor: "pointer", transition: "transform 0.14s, box-shadow 0.14s" }}
-                onClick={() => onNavigate(a.tab)}
-                onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 10px 30px rgba(0,0,0,0.1)"; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = ""; }}
-              >
-                <div className="card-body" style={{ padding: "1.25rem", textAlign: "center" }}>
-                  <div style={{ fontSize: "1.875rem", marginBottom: "0.5rem" }}>{a.emoji}</div>
-                  <div style={{ fontWeight: 900, fontSize: "var(--text-sm)", letterSpacing: "-0.02em", textTransform: "lowercase" }}>{a.label}</div>
-                  <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginTop: "0.2rem" }}>{a.desc}</div>
-                </div>
+      {/* ══ Quick Actions ══ */}
+      <div>
+        <SectionHead accent="accent-upload" title="Quick Actions" subtitle="Jump to any step" />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.875rem" }}>
+          {QUICK_ACTIONS.map(a => (
+            <div key={a.tab} className="card"
+              style={{ cursor: "pointer", transition: "transform 0.14s, box-shadow 0.14s" }}
+              onClick={() => onNavigate(a.tab)}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 10px 30px rgba(0,0,0,0.08)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = ""; }}
+            >
+              <div className="card-body" style={{ padding: "1.25rem", textAlign: "center" }}>
+                <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>{a.emoji}</div>
+                <div style={{ fontWeight: 900, fontSize: "var(--text-sm)", letterSpacing: "-0.02em", textTransform: "lowercase" }}>{a.label}</div>
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginTop: "0.2rem" }}>{a.desc}</div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* ══ ROW 3: recent items ══ */}
+      {/* ══ Recent Items ══ */}
       {recent.length > 0 && (
         <div>
-          <H2>recent items.</H2>
+          <SectionHead accent="accent-pricing" title="Recent Items" subtitle="Latest uploads" />
           <div className="table-wrap">
             <table>
               <thead><tr>

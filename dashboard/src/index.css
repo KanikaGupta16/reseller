@@ -128,10 +128,10 @@ body {
 }
 .card-stat:hover { transform: translateY(-3px); box-shadow: 0 12px 40px rgba(0,0,0,0.12); }
 
-.card-stat-pink   { background: var(--pink);   }
-.card-stat-blue   { background: var(--blue);   }
-.card-stat-yellow { background: var(--yellow); }
-.card-stat-green  { background: #bbf7d0; }
+.card-stat-pink   { background: #FCE4EF; }
+.card-stat-blue   { background: #DFF0FA; }
+.card-stat-yellow { background: #FFF8CC; }
+.card-stat-green  { background: #D4F8E5; }
 .card-stat-black  { background: var(--black); color: var(--white); }
 
 .card-stat-icon  { font-size: 2rem; line-height: 1; }
