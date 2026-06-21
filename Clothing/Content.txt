@@ -1,0 +1,9 @@
+{
+  "title": "Slim-Fit Waffle-Knit Polo Shirt",
+  "price": 21,
+  "category": "T-shirts",
+
+  "condition": "Like new",
+  "size": "L",
+  "quantity" : 1
+}
