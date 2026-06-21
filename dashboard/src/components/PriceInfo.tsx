@@ -100,54 +100,50 @@ export default function PriceInfo() {
         const hasPrice = item.research_suggested_price != null;
 
         return (
-          <div key={item.id} className="card" style={{ marginBottom: 16 }}>
+          <div key={item.id} className="card" style={{ marginBottom: "1rem" }}>
             <div
-              style={{ display: "flex", gap: 16, cursor: "pointer" }}
+              style={{ display: "flex", gap: 0, cursor: "pointer" }}
               onClick={() => setExpanded(isExpanded ? null : item.id)}
             >
               {item.image_url && (
                 <img
                   src={item.image_url}
                   alt=""
-                  style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, flexShrink: 0 }}
+                  style={{ width: 160, height: 160, objectFit: "cover", borderRadius: "14px 0 0 14px", flexShrink: 0 }}
                 />
               )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h3 style={{ margin: "0 0 4px", fontSize: 16 }}>{item.title || "Untitled"}</h3>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-                  {item.brand && <span className="tag">{item.brand}</span>}
-                  {item.category && <span className="tag">{item.category}</span>}
-                  {item.condition && <span className="tag">{item.condition}</span>}
+              <div style={{ flex: 1, minWidth: 0, padding: "1.5rem 1.75rem" }}>
+                <div style={{ fontWeight: 900, fontSize: "1.125rem", letterSpacing: "-0.02em", marginBottom: "0.5rem", lineHeight: 1.2 }}>
+                  {item.title || "Untitled"}
+                </div>
+                <div style={{ display: "flex", gap: "0.375rem", flexWrap: "wrap", marginBottom: "0.875rem" }}>
+                  {item.brand    && <span className="chip">{item.brand}</span>}
+                  {item.category && <span className="chip">{item.category}</span>}
+                  {item.condition && <span className="chip chip-pink">{item.condition}</span>}
                 </div>
 
                 {isRunning && (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
-                    <span style={{ color: "#888", fontSize: 13 }}>
-                      {job.step || "starting"}... {job.progress}%
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
+                    <div className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
+                    <span style={{ color: "var(--muted)", fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                      {job.step || "starting"}… {job.progress}%
                     </span>
                   </div>
                 )}
 
                 {hasPrice && (
-                  <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-                    <span style={{ color: "#E875BB", fontSize: 22, fontWeight: 900 }}>
+                  <div style={{ display: "flex", gap: "1.25rem", alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ color: "var(--pink-2)", fontSize: "2rem", fontWeight: 900, letterSpacing: "-0.04em", lineHeight: 1 }}>
                       ${item.research_suggested_price}
                     </span>
                     {item.research_range && (
-                      <span style={{ color: "#888", fontSize: 13 }}>
-                        Range: ${item.research_range.low} - ${item.research_range.high}
+                      <span style={{ color: "var(--muted)", fontSize: "var(--text-sm)", fontWeight: 600 }}>
+                        Range: ${item.research_range.low} – ${item.research_range.high}
                       </span>
                     )}
                     {item.research_confidence && (
-                      <span style={{
-                        fontSize: 11,
-                        padding: "2px 8px",
-                        borderRadius: 100,
-                        fontWeight: 700,
-                        background: item.research_confidence === "high" ? "#f0fdf4" : item.research_confidence === "medium" ? "#fefce8" : "#fef2f2",
-                        color: item.research_confidence === "high" ? "#16a34a" : item.research_confidence === "medium" ? "#ca8a04" : "#ef4444",
-                      }}>
+                      <span className={`chip ${item.research_confidence === "high" ? "chip-green" : item.research_confidence === "medium" ? "chip-yellow" : ""}`}
+                        style={{ fontWeight: 700 }}>
                         {item.research_confidence} confidence
                       </span>
                     )}
@@ -155,7 +151,7 @@ export default function PriceInfo() {
                 )}
 
                 {!hasPrice && !isRunning && (
-                  <button onClick={(e) => { e.stopPropagation(); startResearch(item.id); }} className="btn btn-primary" style={{ fontSize: 12, padding: "4px 12px" }}>
+                  <button onClick={(e) => { e.stopPropagation(); startResearch(item.id); }} className="btn btn-primary btn-sm">
                     Start Research
                   </button>
                 )}
