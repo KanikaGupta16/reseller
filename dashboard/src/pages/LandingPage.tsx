@@ -406,10 +406,31 @@ export default function LandingPage() {
       <div id="below-fold">
         <div className="ticker-wrap" aria-hidden="true">
           <div className="ticker-track">
-            {['upload your item','scout prices it','studio lists it','closer negotiates','depop + fb marketplace','supabase backend'].flatMap((t, i) => [
-              <span key={`a${i}`} className="tick">{t} <span className="tick-dot">●</span></span>,
-              <span key={`b${i}`} className="tick">{t} <span className="tick-dot">●</span></span>,
-            ])}
+            {[
+              { name: 'Browserbase', color: '#6366f1' },
+              { name: 'Pika',        color: '#E875BB' },
+              { name: 'Supabase',    color: '#3ECF8E' },
+              { name: 'OpenAI',      color: '#10a37f' },
+              { name: 'Depop',       color: '#FF2300' },
+              { name: 'FB Marketplace', color: '#1877f2' },
+              { name: 'Stagehand',   color: '#f59e0b' },
+              { name: 'Claude AI',   color: '#D97706' },
+              { name: 'Playwright',  color: '#2EAD33' },
+              { name: 'Browserbase', color: '#6366f1' },
+              { name: 'Pika',        color: '#E875BB' },
+              { name: 'Supabase',    color: '#3ECF8E' },
+              { name: 'OpenAI',      color: '#10a37f' },
+              { name: 'Depop',       color: '#FF2300' },
+              { name: 'FB Marketplace', color: '#1877f2' },
+              { name: 'Stagehand',   color: '#f59e0b' },
+              { name: 'Claude AI',   color: '#D97706' },
+              { name: 'Playwright',  color: '#2EAD33' },
+            ].map((tech, i) => (
+              <span key={i} className="tick">
+                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: tech.color, marginRight: 6, flexShrink: 0 }} />
+                {tech.name}
+              </span>
+            ))}
           </div>
         </div>
 

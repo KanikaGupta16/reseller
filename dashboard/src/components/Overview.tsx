@@ -2,195 +2,156 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 interface Metrics {
-  total: number;
-  needsReview: number;   // draft, no listing_price
-  inProgress: number;    // research running / media generating
-  listed: number;        // has listed_on entries
-  sold: number;          // status = sold
-  totalRevenue: number;
+  total: number; needsReview: number; inProgress: number; listed: number; sold: number; revenue: number;
 }
-
 interface RecentItem {
-  id: string;
-  title: string;
-  image_url: string | null;
-  category: string;
-  condition: string;
-  listing_price: number | null;
-  listed_on: string[] | null;
-  created_at: string;
+  id: string; title: string; image_url: string | null; category: string;
+  condition: string; listing_price: number | null; listed_on: string[] | null;
+  created_at: string; status: string | null;
 }
 
-const STAT_CARDS = [
-  { key: "total",       label: "Total Items",    emoji: "📦", color: "var(--black)",   bg: "var(--gray)" },
-  { key: "needsReview", label: "Needs Review",   emoji: "👀", color: "#92400e",        bg: "#fef3c7" },
-  { key: "inProgress",  label: "In Progress",    emoji: "🔄", color: "#1e40af",        bg: "#dbeafe" },
-  { key: "listed",      label: "Listed",         emoji: "✅", color: "#166534",        bg: "#dcfce7" },
-  { key: "sold",        label: "Sold",           emoji: "🎉", color: "var(--black)",   bg: "var(--yellow)" },
+const STAT_TILES = [
+  { key: "total",       label: "Total Items",  emoji: "📦", cls: "card-stat-black",  nav: "" },
+  { key: "needsReview", label: "Needs Review", emoji: "👀", cls: "card-stat-yellow", nav: "price-info" },
+  { key: "inProgress",  label: "In Progress",  emoji: "🔄", cls: "card-stat-blue",   nav: "listing-builder" },
+  { key: "listed",      label: "Live Listings",emoji: "✅", cls: "card-stat-green",  nav: "active-listings" },
+  { key: "sold",        label: "Sold",         emoji: "🎉", cls: "card-stat-pink",   nav: "active-listings" },
+];
+
+const QUICK_ACTIONS = [
+  { label: "Upload Item",     emoji: "📷", tab: "upload",          desc: "Drop photos to analyse" },
+  { label: "Check Pricing",   emoji: "🔍", tab: "price-info",      desc: "Scout live market comps" },
+  { label: "Build Listing",   emoji: "🎬", tab: "listing-builder", desc: "Edit & publish" },
+  { label: "View Active",     emoji: "📦", tab: "active-listings", desc: "Live on marketplace" },
+  { label: "Open Messenger",  emoji: "💬", tab: "messenger",       desc: "Reply to buyers" },
 ];
 
 export default function Overview({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [recent, setRecent]   = useState<RecentItem[]>([]);
+  const [recent,  setRecent]  = useState<RecentItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-      const { data: items } = await supabase
-        .from("items")
-        .select("id, title, image_url, category, condition, listing_price, listed_on, created_at, status")
-        .order("created_at", { ascending: false });
-
-      if (!items) { setLoading(false); return; }
-
-      const m: Metrics = {
-        total:       items.length,
-        needsReview: items.filter(i => !i.listing_price && !(i.listed_on?.length)).length,
-        inProgress:  items.filter(i => i.listing_price && !(i.listed_on?.length)).length,
-        listed:      items.filter(i => i.listed_on?.length > 0 && i.status !== "sold").length,
-        sold:        items.filter(i => i.status === "sold").length,
-        totalRevenue: items
-          .filter(i => i.status === "sold" && i.listing_price)
-          .reduce((acc, i) => acc + (i.listing_price ?? 0), 0),
-      };
-
-      setMetrics(m);
-      setRecent(items.slice(0, 6) as RecentItem[]);
+    supabase.from("items").select("*").order("created_at", { ascending: false }).then(({ data }) => {
+      if (!data) { setLoading(false); return; }
+      setMetrics({
+        total:       data.length,
+        needsReview: data.filter(i => !i.listing_price && !i.listed_on?.length).length,
+        inProgress:  data.filter(i => i.listing_price  && !i.listed_on?.length).length,
+        listed:      data.filter(i => i.listed_on?.length > 0 && i.status !== "sold").length,
+        sold:        data.filter(i => i.status === "sold").length,
+        revenue:     data.filter(i => i.status === "sold" && i.listing_price).reduce((a, i) => a + (i.listing_price ?? 0), 0),
+      });
+      setRecent(data.slice(0, 5) as RecentItem[]);
       setLoading(false);
-    }
-    load();
+    });
   }, []);
 
-  if (loading) return (
-    <div className="empty">
-      <div className="spinner" />
-      <span>Loading overview…</span>
-    </div>
-  );
+  if (loading) return <div className="empty"><div className="spinner" /><span>Loading…</span></div>;
 
-  if (!metrics) return (
-    <div className="empty">
-      <span className="empty-icon">📊</span>
-      <span>No data yet — upload your first item to get started.</span>
-      <button className="btn btn-primary btn-sm" onClick={() => onNavigate("upload")}>Upload Item</button>
+  if (!metrics || metrics.total === 0) return (
+    <div className="empty" style={{ minHeight: 300 }}>
+      <span className="empty-icon">📦</span>
+      <span style={{ fontWeight: 700, fontSize: "1.125rem" }}>No items yet</span>
+      <span>Upload your first item to get started</span>
+      <button className="btn btn-primary" onClick={() => onNavigate("upload")}>Upload Item 📷</button>
     </div>
   );
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
 
-      {/* Stat cards */}
+      {/* ── Stat tiles ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "1rem" }}>
-        {STAT_CARDS.map(s => {
+        {STAT_TILES.map(s => {
           const val = metrics[s.key as keyof Metrics] as number;
           return (
-            <div key={s.key} className="card" style={{ cursor: "pointer", transition: "transform 0.12s" }}
-              onClick={() => {
-                if (s.key === "needsReview" || s.key === "inProgress") onNavigate("price-info");
-                if (s.key === "listed" || s.key === "sold") onNavigate("active-listings");
-              }}
-              onMouseEnter={e => (e.currentTarget.style.transform = "translateY(-2px)")}
-              onMouseLeave={e => (e.currentTarget.style.transform = "none")}
+            <div key={s.key} className={`card-stat ${s.cls}`}
+              onClick={() => s.nav && onNavigate(s.nav)}
+              style={{ cursor: s.nav ? "pointer" : "default" }}
             >
-              <div className="card-body" style={{ textAlign: "center" }}>
-                <div style={{
-                  width: 48, height: 48, borderRadius: "50%",
-                  background: s.bg, display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "1.375rem", margin: "0 auto 0.875rem"
-                }}>{s.emoji}</div>
-                <div style={{ fontSize: "2rem", fontWeight: 900, letterSpacing: "-0.04em", lineHeight: 1, color: s.color }}>
-                  {s.key === "totalRevenue" ? `$${val.toLocaleString()}` : val}
-                </div>
-                <div style={{ fontSize: "var(--text-xs)", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--muted)", marginTop: "0.375rem" }}>
-                  {s.label}
-                </div>
-              </div>
+              <div className="card-stat-icon">{s.emoji}</div>
+              <div className="card-stat-val">{val}</div>
+              <div className="card-stat-label">{s.label}</div>
             </div>
           );
         })}
       </div>
 
-      {/* Revenue highlight */}
-      {metrics.totalRevenue > 0 && (
-        <div className="card" style={{ background: "var(--black)", border: "none" }}>
-          <div className="card-body" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div>
-              <div style={{ fontSize: "var(--text-xs)", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: "0.5rem" }}>
-                Total Revenue
-              </div>
-              <div style={{ fontSize: "clamp(2rem,4vw,3.5rem)", fontWeight: 900, letterSpacing: "-0.04em", color: "var(--yellow)", lineHeight: 1 }}>
-                ${metrics.totalRevenue.toLocaleString()}
-              </div>
+      {/* ── Revenue banner ── */}
+      {metrics.revenue > 0 && (
+        <div style={{
+          background: "var(--black)", borderRadius: "var(--radius-lg)",
+          padding: "2rem 2.5rem", display: "flex", alignItems: "center", justifyContent: "space-between"
+        }}>
+          <div>
+            <div style={{ fontSize: "var(--text-xs)", fontWeight: 800, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.45)", marginBottom: "0.5rem" }}>
+              Total Revenue
             </div>
-            <div style={{ fontSize: "3rem", opacity: 0.3 }}>💰</div>
+            <div style={{ fontSize: "clamp(2.5rem,5vw,4rem)", fontWeight: 900, letterSpacing: "-0.05em", color: "var(--yellow)", lineHeight: 1 }}>
+              ${metrics.revenue.toLocaleString()}
+            </div>
           </div>
+          <div style={{ fontSize: "4rem", opacity: 0.2 }}>💰</div>
         </div>
       )}
 
-      {/* Quick actions */}
+      {/* ── Quick actions ── */}
       <div>
-        <div style={{ fontWeight: 900, fontSize: "1.125rem", letterSpacing: "-0.02em", marginBottom: "1rem" }}>Quick Actions</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.875rem" }}>
-          {[
-            { label: "Upload New Item",   emoji: "📷", tab: "upload",          desc: "Add photos to analyse" },
-            { label: "Check Pricing",     emoji: "🔍", tab: "price-info",      desc: `${metrics.inProgress} items awaiting research` },
-            { label: "Build a Listing",   emoji: "🎬", tab: "listing-builder", desc: "Edit & publish to marketplace" },
-            { label: "View Active",       emoji: "📦", tab: "active-listings", desc: `${metrics.listed} live listings` },
-            { label: "Open Messenger",    emoji: "💬", tab: "messenger",       desc: "Reply to buyer messages" },
-          ].map(a => (
-            <div key={a.tab} className="card" style={{ cursor: "pointer", transition: "transform 0.12s, box-shadow 0.12s" }}
+        <div style={{ fontWeight: 900, fontSize: "1.25rem", letterSpacing: "-0.03em", marginBottom: "1rem" }}>Quick Actions</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.875rem" }}>
+          {QUICK_ACTIONS.map(a => (
+            <div key={a.tab} className="card"
+              style={{ cursor: "pointer", transition: "transform 0.14s, box-shadow 0.14s" }}
               onClick={() => onNavigate(a.tab)}
-              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.1)"; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = ""; }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)"; (e.currentTarget as HTMLElement).style.boxShadow = "0 10px 30px rgba(0,0,0,0.1)"; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ""; (e.currentTarget as HTMLElement).style.boxShadow = ""; }}
             >
-              <div className="card-body" style={{ display: "flex", gap: "0.875rem", alignItems: "center" }}>
-                <div style={{ fontSize: "1.5rem", flexShrink: 0 }}>{a.emoji}</div>
-                <div>
-                  <div style={{ fontWeight: 800, fontSize: "var(--text-sm)", letterSpacing: "-0.01em" }}>{a.label}</div>
-                  <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)", marginTop: "0.125rem" }}>{a.desc}</div>
-                </div>
+              <div className="card-body" style={{ padding: "1.25rem", textAlign: "center" }}>
+                <div style={{ fontSize: "1.75rem", marginBottom: "0.5rem" }}>{a.emoji}</div>
+                <div style={{ fontWeight: 800, fontSize: "var(--text-sm)", letterSpacing: "-0.01em", marginBottom: "0.25rem" }}>{a.label}</div>
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--muted)" }}>{a.desc}</div>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Recent items */}
+      {/* ── Recent items ── */}
       {recent.length > 0 && (
         <div>
-          <div style={{ fontWeight: 900, fontSize: "1.125rem", letterSpacing: "-0.02em", marginBottom: "1rem" }}>Recent Items</div>
-          <div className="card table-wrap">
+          <div style={{ fontWeight: 900, fontSize: "1.25rem", letterSpacing: "-0.03em", marginBottom: "1rem" }}>Recent Items</div>
+          <div className="table-wrap">
             <table>
               <thead><tr>
                 <th>Item</th><th>Category</th><th>Condition</th><th>Price</th><th>Status</th><th>Added</th>
               </tr></thead>
               <tbody>
-                {recent.map(item => (
-                  <tr key={item.id}>
-                    <td style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                      {item.image_url
-                        ? <img src={item.image_url} alt={item.title} style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
-                        : <div style={{ width: 40, height: 40, borderRadius: 8, background: "var(--gray)", flexShrink: 0 }} />
-                      }
-                      <span style={{ fontWeight: 700, fontSize: "var(--text-sm)" }}>{item.title}</span>
-                    </td>
-                    <td><span className="chip">{item.category}</span></td>
-                    <td><span className="chip chip-pink">{item.condition}</span></td>
-                    <td style={{ fontWeight: 700 }}>{item.listing_price ? `$${item.listing_price}` : <span style={{ color: "var(--muted)" }}>—</span>}</td>
-                    <td>
-                      {item.listed_on?.length
-                        ? <span className="chip" style={{ background: "#dcfce7", color: "#166534" }}>Listed</span>
-                        : item.listing_price
-                          ? <span className="chip" style={{ background: "#dbeafe", color: "#1e40af" }}>In Progress</span>
-                          : <span className="chip" style={{ background: "#fef3c7", color: "#92400e" }}>Needs Review</span>
-                      }
-                    </td>
-                    <td style={{ color: "var(--muted)", fontSize: "var(--text-xs)" }}>
-                      {new Date(item.created_at).toLocaleDateString()}
-                    </td>
-                  </tr>
-                ))}
+                {recent.map(item => {
+                  const statusLabel = item.listed_on?.length
+                    ? { label: "Listed",     cls: "chip-green"  }
+                    : item.listing_price
+                      ? { label: "In Progress",cls: "chip-blue"  }
+                      : { label: "Needs Review",cls: "chip-yellow"};
+                  return (
+                    <tr key={item.id}>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                          {item.image_url
+                            ? <img src={item.image_url} alt={item.title} style={{ width: 44, height: 44, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />
+                            : <div style={{ width: 44, height: 44, borderRadius: 8, background: "var(--gray)", flexShrink: 0 }} />
+                          }
+                          <span style={{ fontWeight: 700, fontSize: "var(--text-sm)" }}>{item.title}</span>
+                        </div>
+                      </td>
+                      <td><span className="chip">{item.category}</span></td>
+                      <td><span className="chip chip-pink">{item.condition}</span></td>
+                      <td style={{ fontWeight: 800 }}>{item.listing_price ? `$${item.listing_price}` : <span style={{ color: "var(--muted)" }}>—</span>}</td>
+                      <td><span className={`chip ${statusLabel.cls}`}>{statusLabel.label}</span></td>
+                      <td style={{ color: "var(--muted)", fontSize: "var(--text-xs)" }}>{new Date(item.created_at).toLocaleDateString()}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
