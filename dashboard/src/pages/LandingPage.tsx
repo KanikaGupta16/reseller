@@ -430,7 +430,7 @@ export default function LandingPage() {
 
               {(uploadStep === 'processing' || uploadStep === 'done') && uploadedImg && (
                 <div className="upload-preview-wrap">
-                  <div className="upload-preview-col">
+                  <div className={`upload-preview-col ${uploadStep === 'processing' ? 'scanning' : 'done'}`}>
                     {/* Show Pika video when ready, otherwise show uploaded image */}
                     {videoUrl ? (
                       <div style={{ position: 'relative' }}>
