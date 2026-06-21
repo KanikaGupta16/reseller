@@ -91,7 +91,6 @@ export default function PriceInfo() {
 
   return (
     <div>
-      <h2 style={{ fontSize: 20, marginBottom: 16 }}>Price Research</h2>
 
       {items.map((item) => {
         const job = jobs[item.id];
