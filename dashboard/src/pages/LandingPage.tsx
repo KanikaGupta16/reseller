@@ -72,7 +72,8 @@ export default function LandingPage() {
   const [item]                      = useState(() => MOCK_ITEMS[Math.floor(Math.random() * MOCK_ITEMS.length)])
   const [realItem, setRealItem]     = useState<{ title: string; tags: string[]; price?: number } | null>(null)
   const [videoUrl, setVideoUrl]     = useState<string | null>(null)
-  const [itemId,   setItemId]       = useState<string | null>(null)
+  const [itemId,        setItemId]        = useState<string | null>(null)
+  const [showDashLink,  setShowDashLink]  = useState(false)
 
   useEffect(() => {
     let id: number
@@ -244,9 +245,16 @@ export default function LandingPage() {
     }
   }, [item])
 
+  // Show dashboard link 4.5s after done
+  useEffect(() => {
+    if (uploadStep !== 'done') { setShowDashLink(false); return }
+    const t = setTimeout(() => setShowDashLink(true), 4500)
+    return () => clearTimeout(t)
+  }, [uploadStep])
+
   const resetUpload = () => {
     setUploadStep('idle'); setUploadedImg(null); setRealItem(null)
-    setVideoUrl(null); setItemId(null)
+    setVideoUrl(null); setItemId(null); setShowDashLink(false)
     setScout('idle'); setStudio('idle'); setCloser('idle')
   }
 
@@ -417,6 +425,29 @@ export default function LandingPage() {
                   <button className="pill pill-big" style={{ background: 'var(--pink-2)' }}>Push live →</button>
                   <button className="pill pill-big pill-outline" onClick={resetUpload}>Try another</button>
                 </div>
+
+                {/* Dashboard link — slides in after 4.5s */}
+                {showDashLink && (
+                  <Link
+                    to={`/dashboard${itemId ? `?tab=price-info&item=${itemId}` : ''}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      gap: '0.875rem', marginTop: '1rem',
+                      background: 'var(--black)', color: 'var(--white)',
+                      borderRadius: 'var(--radius-md)', padding: '1rem 1.25rem',
+                      textDecoration: 'none', fontWeight: 800, fontSize: 'var(--text-sm)',
+                      animation: 'dashLinkIn 0.5s cubic-bezier(0.34,1.56,0.64,1) both',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 'var(--text-xs)', opacity: 0.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
+                        Next step
+                      </div>
+                      View pricing research in Dashboard
+                    </div>
+                    <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>🔍 →</span>
+                  </Link>
+                )}
               </>}
             </div>
 
